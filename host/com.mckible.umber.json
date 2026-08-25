@@ -1,6 +1,6 @@
 {
-  "name": "com.omarchy.theme",
-  "description": "Streams the Omarchy theme palette to the Omatheme extension",
+  "name": "com.mckible.umber",
+  "description": "Streams the Omarchy theme palette to the Umber extension",
   "path": "__HOST_PATH__",
   "type": "stdio",
   "allowed_origins": ["chrome-extension://jgaobdgdpcdgbmidehlfoiabemkakalp/"]

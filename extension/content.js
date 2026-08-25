@@ -99,7 +99,7 @@ const scanForShadows = node => {
 }
 
 // Imperative roots, announced by the MAIN-world attachShadow hook.
-addEventListener("omatheme-shadow", e => {
+addEventListener("umber-shadow", e => {
   if (e.target instanceof Element) trackRoot(e.target.shadowRoot)
 }, true)
 

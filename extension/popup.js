@@ -69,7 +69,7 @@ const init = async () => {
   $("pick").disabled = $("generate").disabled = !themable
 
   $("pick").addEventListener("click", async () => {
-    await chrome.tabs.sendMessage(tab.id, "omatheme-pick").catch(() => {})
+    await chrome.tabs.sendMessage(tab.id, "umber-pick").catch(() => {})
     window.close()
   })
 
@@ -78,7 +78,7 @@ const init = async () => {
   // the progress UI; the live styles push previews every save.
   $("generate").addEventListener("click", async () => {
     $("generate").disabled = true
-    const census = await chrome.tabs.sendMessage(tab.id, "omatheme-census").catch(() => null)
+    const census = await chrome.tabs.sendMessage(tab.id, "umber-census").catch(() => null)
     const screenshot = await chrome.tabs.captureVisibleTab(null, { format: "jpeg", quality: 60 }).catch(() => null)
     const resp = await chrome.runtime.sendMessage({
       toHost: { type: "agent", url, site, census: census || {}, screenshot },

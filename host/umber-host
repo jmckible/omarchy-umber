@@ -1,5 +1,5 @@
 #!/bin/bash
-# Native messaging host: bidirectional bridge between Omarchy and the Omatheme
+# Native messaging host: bidirectional bridge between Omarchy and the Umber
 # extension. Speaks the Chromium native messaging protocol (4-byte LE length +
 # JSON) in both directions.
 #
@@ -7,7 +7,7 @@
 #   {type:"palette", colors:{...}}       on connect and on every theme change
 #   {type:"styles", styles:[{name, matches, css}]}
 #                                        on connect and whenever a file in
-#                                        ~/.config/omatheme/sites/ changes
+#                                        ~/.config/umber/sites/ changes
 #   {type:"generate-status", site, status, detail}
 # From the extension it handles:
 #   {type:"append", site, matches, css}  append a rule to a site's stylesheet
@@ -16,11 +16,11 @@
 export PATH="/usr/local/bin:/usr/bin:$HOME/.local/bin:$HOME/.local/share/mise/shims:$PATH"
 
 REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
-CONFIG_DIR="$HOME/.config/omatheme"
+CONFIG_DIR="$HOME/.config/umber"
 SITES_DIR="$CONFIG_DIR/sites"
 STATE_DIR="$HOME/.local/state/omarchy/current"
 GENLOCK="$CONFIG_DIR/.generate.lock"
-LOCKFILE=$(mktemp "${XDG_RUNTIME_DIR:-/tmp}/omatheme-host.XXXXXX")
+LOCKFILE=$(mktemp "${XDG_RUNTIME_DIR:-/tmp}/umber-host.XXXXXX")
 
 mkdir -p "$SITES_DIR"
 
@@ -99,7 +99,7 @@ handle_append() {
 }
 
 # Headless generation command: a shell line that reads the prompt on stdin and
-# prints CSS on stdout. ~/.config/omatheme/agent overrides; otherwise the slug
+# prints CSS on stdout. ~/.config/umber/agent overrides; otherwise the slug
 # from omarchy-default-agent picks the spelling, since omarchy-agent itself
 # only knows interactive TUI launches. Agents are mise-installed, and the shims
 # dir is already on PATH.
@@ -120,7 +120,7 @@ agent_command() {
 
 build_prompt() { # url site census
   cat <<EOF
-You are Omatheme's stylesheet generator. Write a site stylesheet that retints the page below with the Omarchy desktop palette.
+You are Umber's stylesheet generator. Write a site stylesheet that retints the page below with the Omarchy desktop palette.
 
 Output rules:
 - Output ONLY raw CSS. No markdown fences, no commentary before or after.
@@ -158,7 +158,7 @@ handle_generate() {
     fi
     local cmd css
     if ! cmd=$(agent_command); then
-      send_status "$site" error "no headless spelling for agent '$(omarchy-default-agent 2>/dev/null)' — put a command in ~/.config/omatheme/agent (prompt on stdin, CSS on stdout)"
+      send_status "$site" error "no headless spelling for agent '$(omarchy-default-agent 2>/dev/null)' — put a command in ~/.config/umber/agent (prompt on stdin, CSS on stdout)"
       exit 0
     fi
     if ! command -v "${cmd%% *}" >/dev/null; then
@@ -168,7 +168,7 @@ handle_generate() {
     local agent_name out pid start
     agent_name=$(basename "${cmd%% *}")
     send_status "$site" running "asking $agent_name for a stylesheet"
-    out=$(mktemp "${XDG_RUNTIME_DIR:-/tmp}/omatheme-gen.XXXXXX")
+    out=$(mktemp "${XDG_RUNTIME_DIR:-/tmp}/umber-gen.XXXXXX")
     (cd "$REPO" && build_prompt "$url" "$site" "$census" | timeout 600 bash -c "$cmd" >"$out" 2>/dev/null) &
     pid=$!
     start=$SECONDS
@@ -182,13 +182,13 @@ handle_generate() {
     rm -f "$out"
     if [[ $css != *"--omarchy-"* || $css != *"{"* ]]; then
       send_status "$site" error "agent returned no usable CSS"
-      notify-send "Omatheme" "Theme generation for $site failed" 2>/dev/null
+      notify-send "Umber" "Theme generation for $site failed" 2>/dev/null
       exit 0
     fi
     grep -q '@match' <<<"$css" || css=$(printf '/* @match *://%s/* */\n%s' "$site" "$css")
     printf '%s\n' "$css" >"$SITES_DIR/$site.css"
     send_status "$site" done "wrote sites/$site.css"
-    notify-send "Omatheme" "Generated theme for $site" 2>/dev/null
+    notify-send "Umber" "Generated theme for $site" 2>/dev/null
   ) &
 }
 
@@ -214,7 +214,7 @@ handle_agent() {
   fi
   verb="create"
   [[ -f $SITES_DIR/$site.css ]] && verb="refine"
-  prompt="Read $CONFIG_DIR/AGENT.md first and follow it. Then $verb the Omatheme stylesheet for $url at $SITES_DIR/$site.css. Fresh page context (census.json, page.jpg, url) is in $ctx. If you have browser tools (MCP), inspect the live page and the site's other page types directly; the context files are the fallback. Your saves restyle the user's open tabs live."
+  prompt="Read $CONFIG_DIR/AGENT.md first and follow it. Then $verb the Umber stylesheet for $url at $SITES_DIR/$site.css. Fresh page context (census.json, page.jpg, url) is in $ctx. If you have browser tools (MCP), inspect the live page and the site's other page types directly; the context files are the fallback. Your saves restyle the user's open tabs live."
   setsid -f omarchy-agent-prompt "$prompt" </dev/null >/dev/null 2>&1
   send_status "$site" done "agent terminal launched"
 }

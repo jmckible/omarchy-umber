@@ -5,7 +5,7 @@
 let port = null
 
 function connect() {
-  port = chrome.runtime.connectNative("com.omarchy.theme")
+  port = chrome.runtime.connectNative("com.mckible.umber")
   port.onMessage.addListener(msg => {
     if (!msg) return
     if (msg.type === "palette" || msg.colors) chrome.storage.local.set({ omarchyColors: msg.colors, omarchyConnected: true })
@@ -34,7 +34,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 chrome.commands.onCommand.addListener(async command => {
   if (command !== "pick-element") return
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
-  if (tab) chrome.tabs.sendMessage(tab.id, "omatheme-pick").catch(() => {})
+  if (tab) chrome.tabs.sendMessage(tab.id, "umber-pick").catch(() => {})
 })
 
 connect()

@@ -7,7 +7,7 @@
   Element.prototype.attachShadow = function (init) {
     const root = original.call(this, init)
     if (init && init.mode === "open")
-      this.dispatchEvent(new CustomEvent("omatheme-shadow", { bubbles: true, composed: true }))
+      this.dispatchEvent(new CustomEvent("umber-shadow", { bubbles: true, composed: true }))
     return root
   }
 }

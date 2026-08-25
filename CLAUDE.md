@@ -1,4 +1,4 @@
-# Omatheme
+# Umber
 
 Live Omarchy theme sync for Chromium-family browsers. Architecture and install are in [README.md](README.md) — read it first.
 
@@ -6,8 +6,8 @@ Live Omarchy theme sync for Chromium-family browsers. Architecture and install a
 
 - Extension ID is pinned to `jgaobdgdpcdgbmidehlfoiabemkakalp` via the `key` field in `extension/manifest.json` (public key `.extension-key.b64`, keypair `key.pem` git-ignored). The native host manifest's `allowed_origins` depends on it — never regenerate casually. For a Chrome Web Store upload the `key` field must be removed (the store assigns its own ID), which would break the local native-host pairing; keep store packaging on a branch if attempted.
 - Palette keys come from `omarchy-theme-color --all` (56 keys), underscores hyphenated: `background` → `--omarchy-background`, `lighter_background` → `--omarchy-lighter-background`. `content.js` also stamps `data-omarchy-mode="dark|light"` on `<html>` for mode-scoped CSS.
-- Site styles are files in `~/.config/omatheme/sites/*.css`, scoped by a `/* @match pattern, pattern */` header (Chromium match patterns; bare `host` is shorthand for `*://host/*`). The host inotify-watches that dir and re-pushes on any change, so editing a file restyles open tabs live — that dir is the iteration surface. Repo `sites/` holds the curated starters that `./install` seeds with `cp` no-overwrite.
-- Host↔extension protocol (native messaging, all JSON): host pushes `{type:"palette"|"styles"|"generate-status"}`; extension sends `{type:"append", site, matches, css}` (picker save) and `{type:"generate", url, site, census}` (agent generation; the agent comes from the `omarchy-default-agent` slug mapped to a headless spelling, or the shell command in `~/.config/omatheme/agent` — contract: prompt on stdin, CSS on stdout). Storage keys: `omarchyColors`, `omarchyStyles`, `omarchyEnabled`, `omarchyConnected`, `omarchyGenerate`.
+- Site styles are files in `~/.config/umber/sites/*.css`, scoped by a `/* @match pattern, pattern */` header (Chromium match patterns; bare `host` is shorthand for `*://host/*`). The host inotify-watches that dir and re-pushes on any change, so editing a file restyles open tabs live — that dir is the iteration surface. Repo `sites/` holds the curated starters that `./install` seeds with `cp` no-overwrite.
+- Host↔extension protocol (native messaging, all JSON): host pushes `{type:"palette"|"styles"|"generate-status"}`; extension sends `{type:"append", site, matches, css}` (picker save) and `{type:"generate", url, site, census}` (agent generation; the agent comes from the `omarchy-default-agent` slug mapped to a headless spelling, or the shell command in `~/.config/umber/agent` — contract: prompt on stdin, CSS on stdout). Storage keys: `omarchyColors`, `omarchyStyles`, `omarchyEnabled`, `omarchyConnected`, `omarchyGenerate`.
 - `content.js` attaches site CSS via `adoptedStyleSheets` (sorts after the page's own sheets — wins specificity ties without `!important`). The host re-sends palette when `~/.local/state/omarchy/current/theme.name` gets a `close_write` — written after the atomic theme-dir swap, so it marks a completed theme change.
 - Host code changes only take effect on a fresh port (extension reload or browser restart); extension code changes need an extension reload; site CSS changes need nothing.
 - Bash follows Omarchy conventions: `#!/bin/bash`, `[[ ]]` for tests, two-space indent.
@@ -16,7 +16,7 @@ Live Omarchy theme sync for Chromium-family browsers. Architecture and install a
 
 The user's daily browser is **Helium** (extension loaded via `--load-extension` in `~/.config/helium-browser-flags.conf`). The claude-in-chrome MCP browser is a **separate Chrome instance that also has the extension** (loaded unpacked, 2026-08-25) — it is the styling lab, running the real pipeline:
 
-1. Iterate by editing `~/.config/omatheme/sites/<site>.css` directly — open lab tabs restyle on save. Probe with `document.elementFromPoint(x, y)` ancestor chains (tag + classes + computed color/background), and enumerate icon sprites by filtering a container's descendants for `backgroundImage !== "none"` or `IMG` tags.
+1. Iterate by editing `~/.config/umber/sites/<site>.css` directly — open lab tabs restyle on save. Probe with `document.elementFromPoint(x, y)` ancestor chains (tag + classes + computed color/background), and enumerate icon sprites by filtering a container's descendants for `backgroundImage !== "none"` or `IMG` tags.
 2. Test BOTH modes before shipping. For a theme that isn't active, either switch the desktop theme (ask the user first — it retints everything) or override the injected values inline with `javascript_tool`: set `--omarchy-*` properties and `data-omarchy-mode` on `documentElement` using `omarchy-theme-color --file <theme>/colors.toml`.
 3. Ship a starter by copying the verified file into repo `sites/` and committing. Extension code changes: user reloads via `chrome://extensions` ↻ (both browsers). Host or native-manifest changes: re-run `./install`, then reload the extension to reconnect the port.
 4. Only one session should drive the claude-in-chrome browser at a time.

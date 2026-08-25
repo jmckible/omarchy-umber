@@ -1,12 +1,12 @@
-# Omatheme agent guide
+# Umber agent guide
 
-You are working on Omatheme site stylesheets: per-site CSS files that retint websites with the live Omarchy desktop palette. Read this whole file before editing anything.
+You are working on Umber site stylesheets: per-site CSS files that retint websites with the live Omarchy desktop palette. Read this whole file before editing anything.
 
 ## The loop
 
-- Stylesheets live in `~/.config/omatheme/sites/<site>.css`, one file per site, named by hostname (e.g. `www.reddit.com.css`). Repo-curated starters also exist (e.g. `gmail.css`); prefer editing the file that already matches the site.
+- Stylesheets live in `~/.config/umber/sites/<site>.css`, one file per site, named by hostname (e.g. `www.reddit.com.css`). Repo-curated starters also exist (e.g. `gmail.css`); prefer editing the file that already matches the site.
 - **Every save applies instantly to the user's open tabs** — no reload, no build step. Iterate in small increments and ask the user what they see, or ask them to describe/screenshot problem areas.
-- Session context may be in `~/.config/omatheme/context/<site>/`: `census.json` (visible elements clustered by computed color and background, with counts and one sample selector each), `page.jpg` (screenshot at capture time), and `url`. The census is orientation, not a work list: it tells you the surface colors and hands you stable anchor selectors. It reflects only the captured page — usually the home feed, the *least* representative surface — and its `omarchyMode` field is the desktop mode, not the site's own theme state. Probe detail/comment/settings pages live.
+- Session context may be in `~/.config/umber/context/<site>/`: `census.json` (visible elements clustered by computed color and background, with counts and one sample selector each), `page.jpg` (screenshot at capture time), and `url`. The census is orientation, not a work list: it tells you the surface colors and hands you stable anchor selectors. It reflects only the captured page — usually the home feed, the *least* representative surface — and its `omarchyMode` field is the desktop mode, not the site's own theme state. Probe detail/comment/settings pages live.
 
 ## File format
 

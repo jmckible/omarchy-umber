@@ -2,7 +2,7 @@
 set -euo pipefail
 
 REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-HOST_NAME="com.omarchy.theme"
+HOST_NAME="com.mckible.umber"
 
 browser_dirs=(
   "$HOME/.config/net.imput.helium"
@@ -10,7 +10,7 @@ browser_dirs=(
   "$HOME/.config/google-chrome"
 )
 
-manifest=$(sed "s|__HOST_PATH__|$REPO/host/omatheme-host|" "$REPO/host/$HOST_NAME.json")
+manifest=$(sed "s|__HOST_PATH__|$REPO/host/umber-host|" "$REPO/host/$HOST_NAME.json")
 
 for dir in "${browser_dirs[@]}"; do
   if [[ -d $dir ]]; then
@@ -21,25 +21,25 @@ done
 
 # Seed the user styles dir with the bundled starters (never overwriting local
 # edits); the host watches this dir and pushes changes live.
-mkdir -p "$HOME/.config/omatheme/sites"
+mkdir -p "$HOME/.config/umber/sites"
 for f in "$REPO"/sites/*.css; do
   [[ -f $f ]] || continue
-  dest="$HOME/.config/omatheme/sites/$(basename "$f")"
+  dest="$HOME/.config/umber/sites/$(basename "$f")"
   [[ -f $dest ]] || cp "$f" "$dest"
 done
 
 # The agent guide is ours to keep current — always refreshed. The Claude skill
 # is a thin pointer at it, linked in only when Claude Code is around.
-cp -f "$REPO/AGENT.md" "$HOME/.config/omatheme/AGENT.md"
+cp -f "$REPO/AGENT.md" "$HOME/.config/umber/AGENT.md"
 if [[ -d $HOME/.claude ]]; then
   mkdir -p "$HOME/.claude/skills"
-  ln -sfn "$REPO/skill" "$HOME/.claude/skills/omatheme"
+  ln -sfn "$REPO/skill" "$HOME/.claude/skills/umber"
 fi
 
 # Join Helium's --load-extension list rather than adding a second line: Chromium
 # takes the last occurrence of a repeated switch, which would drop copy-url.
 FLAGS="$HOME/.config/helium-browser-flags.conf"
-if [[ -f $FLAGS ]] && ! grep -q "omatheme/extension" "$FLAGS"; then
+if [[ -f $FLAGS ]] && ! grep -q "umber/extension" "$FLAGS"; then
   if grep -q -- "^--load-extension=" "$FLAGS"; then
     sed -i "s|^--load-extension=.*|&,$REPO/extension|" "$FLAGS"
   else

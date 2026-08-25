@@ -1,5 +1,5 @@
-// Element picker + page census. Top frame only; woken by "omatheme-pick"
-// (popup button or keyboard command) and "omatheme-census" messages.
+// Element picker + page census. Top frame only; woken by "umber-pick"
+// (popup button or keyboard command) and "umber-census" messages.
 // Picked remaps become plain CSS appended to the site's file via the host, so
 // hand edits, picker output, and agent output all land in the same place.
 (() => {
@@ -164,9 +164,9 @@
     if (changes.omarchyStyles) clearPreview()
     const gen = changes.omarchyGenerate?.newValue
     if (gen && gen.site === location.hostname) {
-      if (gen.status === "running") toast(`Omatheme: ${gen.detail}`, { sticky: true })
-      else if (gen.status === "done") toast(`Omatheme: ${gen.detail}`)
-      else if (gen.status === "error") toast(`Omatheme: ${gen.detail}`, { error: true })
+      if (gen.status === "running") toast(`Umber: ${gen.detail}`, { sticky: true })
+      else if (gen.status === "done") toast(`Umber: ${gen.detail}`)
+      else if (gen.status === "error") toast(`Umber: ${gen.detail}`, { error: true })
     }
   })
 
@@ -362,7 +362,7 @@
   }
 
   chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-    if (msg === "omatheme-pick") enterPickMode()
-    else if (msg === "omatheme-census") sendResponse(buildCensus())
+    if (msg === "umber-pick") enterPickMode()
+    else if (msg === "umber-census") sendResponse(buildCensus())
   })
 })()
