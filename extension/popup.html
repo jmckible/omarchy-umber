@@ -1,0 +1,60 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  /* Dogfoods the palette: popup.js stamps --omarchy-* onto <html>. */
+  body {
+    width: 280px; margin: 0; font: 13px system-ui, sans-serif;
+    background: var(--omarchy-background, #1e1e2e);
+    color: var(--omarchy-foreground, #cdd6f4);
+  }
+  header { display: flex; align-items: center; gap: 8px; padding: 12px 14px 8px }
+  header img { width: 20px; height: 20px }
+  header h1 { font-size: 14px; margin: 0; flex: 1 }
+  #mode { font-size: 11px; opacity: .6 }
+  section { padding: 0 14px 10px }
+  .row { display: flex; align-items: center; justify-content: space-between; padding: 6px 0 }
+  .muted { opacity: .6; font-size: 12px }
+  #site { font-size: 12px; font-weight: 600; word-break: break-all; margin: 8px 0 4px }
+  #styles { list-style: none; margin: 0 0 4px; padding: 0; font-size: 12px }
+  #styles li { padding: 2px 0; opacity: .55 }
+  #styles li.on { opacity: 1 }
+  #styles li.on::before { content: "● "; color: var(--omarchy-green, #9ece6a) }
+  #styles li::before { content: "○ " }
+  .actions { display: flex; gap: 6px; margin-top: 8px }
+  button {
+    flex: 1; padding: 6px 0; font: 12px system-ui; cursor: pointer; border-radius: 5px;
+    border: 1px solid color-mix(in srgb, var(--omarchy-foreground, #cdd6f4) 25%, transparent);
+    background: color-mix(in srgb, var(--omarchy-foreground, #cdd6f4) 8%, transparent);
+    color: var(--omarchy-foreground, #cdd6f4);
+  }
+  button:disabled { opacity: .4; cursor: default }
+  #generate { background: var(--omarchy-accent, #61afef); color: var(--omarchy-background, #1e1e2e); border-color: transparent }
+  #gen-status { font-size: 11px; margin-top: 8px; min-height: 14px }
+  #gen-status.error { color: var(--omarchy-red, #f66) }
+  input[type=checkbox] { accent-color: var(--omarchy-accent, #61afef) }
+  footer { padding: 8px 14px; font-size: 10px; opacity: .45; border-top: 1px solid color-mix(in srgb, var(--omarchy-foreground, #cdd6f4) 15%, transparent) }
+</style>
+</head>
+<body>
+  <header>
+    <img src="icons/icon32.png" alt="">
+    <h1>Omatheme</h1>
+    <span id="mode"></span>
+  </header>
+  <section>
+    <label class="row"><span>Enabled</span><input type="checkbox" id="enabled"></label>
+    <div class="row"><span class="muted" id="host-status">host: …</span></div>
+    <div id="site"></div>
+    <ul id="styles"></ul>
+    <div class="actions">
+      <button id="pick">Pick element…</button>
+      <button id="generate">Theme with agent</button>
+    </div>
+    <div id="gen-status"></div>
+  </section>
+  <footer>styles live in ~/.config/omatheme/sites/</footer>
+  <script src="popup.js"></script>
+</body>
+</html>

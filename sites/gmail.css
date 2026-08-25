@@ -1,3 +1,4 @@
+/* @match https://mail.google.com/* */
 /* Omarchy palette for Gmail. Forces both surfaces and text so Gmail's internal
    light/dark setting stops mattering. Selectors verified against the live DOM
    2026-08-24: Gmail's short classnames (.zA, .aeN, .T-I) are long-stable; the

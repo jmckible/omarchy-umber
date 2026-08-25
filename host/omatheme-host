@@ -1,29 +1,259 @@
 #!/bin/bash
-# Native messaging host: stream the Omarchy palette to the Omatheme extension.
-# Speaks the Chromium native messaging protocol on stdout (4-byte LE length + JSON).
-# Exits via SIGPIPE when the browser closes the port.
+# Native messaging host: bidirectional bridge between Omarchy and the Omatheme
+# extension. Speaks the Chromium native messaging protocol (4-byte LE length +
+# JSON) in both directions.
+#
+# To the extension it pushes:
+#   {type:"palette", colors:{...}}       on connect and on every theme change
+#   {type:"styles", styles:[{name, matches, css}]}
+#                                        on connect and whenever a file in
+#                                        ~/.config/omatheme/sites/ changes
+#   {type:"generate-status", site, status, detail}
+# From the extension it handles:
+#   {type:"append", site, matches, css}  append a rule to a site's stylesheet
+#   {type:"generate", url, site, census} generate a stylesheet via the agent
+#
+export PATH="/usr/local/bin:/usr/bin:$HOME/.local/bin:$HOME/.local/share/mise/shims:$PATH"
 
-export PATH="/usr/local/bin:/usr/bin:$PATH"
+REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+CONFIG_DIR="$HOME/.config/omatheme"
+SITES_DIR="$CONFIG_DIR/sites"
+STATE_DIR="$HOME/.local/state/omarchy/current"
+GENLOCK="$CONFIG_DIR/.generate.lock"
+LOCKFILE=$(mktemp "${XDG_RUNTIME_DIR:-/tmp}/omatheme-host.XXXXXX")
+
+mkdir -p "$SITES_DIR"
+
+cleanup() {
+  if [[ -n ${WATCHER:-} ]]; then
+    pkill -P "$WATCHER" 2>/dev/null
+    kill "$WATCHER" 2>/dev/null
+    wait "$WATCHER" 2>/dev/null
+  fi
+  rm -f "$LOCKFILE"
+}
+trap cleanup EXIT
+
+# All stdout writes go through here; flock serializes the watcher subshell,
+# generate subshells, and the main loop onto the single pipe. wc -c because the
+# length prefix counts bytes, not the current locale's characters — and the
+# locale stays untouched so launched agent terminals inherit the real one.
+send_msg() {
+  local len
+  len=$(printf %s "$1" | wc -c)
+  {
+    flock 9
+    printf "$(printf '\\x%02x\\x%02x\\x%02x\\x%02x' $((len & 255)) $((len >> 8 & 255)) $((len >> 16 & 255)) $((len >> 24 & 255)))"
+    printf '%s' "$1"
+  } 9>>"$LOCKFILE"
+}
 
 send_palette() {
-  local json len
+  local json
   json=$(omarchy-theme-color --all 2>/dev/null |
-    jq -Rcn '{colors: ([inputs | select(length > 0) | split("\t") | {(.[0]): .[1]}] | add)}')
-  [[ -n $json ]] || return 0
+    jq -Rcn '{type: "palette", colors: ([inputs | select(length > 0) | split("\t") | {(.[0]): .[1]}] | add)}')
+  [[ -n $json ]] && send_msg "$json"
+}
 
-  len=${#json}
-  printf "$(printf '\\x%02x\\x%02x\\x%02x\\x%02x' $((len & 255)) $((len >> 8 & 255)) $((len >> 16 & 255)) $((len >> 24 & 255)))"
-  printf '%s' "$json"
+# A style's scope lives in the file itself: a /* @match pattern, pattern */
+# comment (first occurrence wins). Files without one get matches: [].
+send_styles() {
+  local f name matches json="[]"
+  for f in "$SITES_DIR"/*.css; do
+    [[ -f $f ]] || continue
+    name=$(basename "$f" .css)
+    matches=$(grep -m1 '@match' "$f" | sed -E 's/.*@match[[:space:]]+//; s/[[:space:]]*\*\/.*//')
+    json=$(jq -c --arg name "$name" --arg m "$matches" --rawfile css "$f" \
+      '. + [{name: $name, matches: ($m | split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(length > 0))), css: $css}]' <<<"$json")
+  done
+  send_msg "$(jq -c '{type: "styles", styles: .}' <<<"$json")"
+}
+
+send_status() { # site status detail
+  send_msg "$(jq -nc --arg site "$1" --arg status "$2" --arg detail "${3:-}" \
+    '{type: "generate-status", site: $site, status: $status, detail: $detail}')"
+}
+
+read_message() {
+  local hdr len
+  hdr=$(dd iflag=fullblock bs=4 count=1 2>/dev/null | od -An -v -tu1)
+  set -- $hdr
+  [[ $# -eq 4 ]] || return 1
+  len=$(($1 | ($2 << 8) | ($3 << 16) | ($4 << 24)))
+  ((len > 0 && len < 4194304)) || return 1
+  dd iflag=fullblock bs="$len" count=1 2>/dev/null
+}
+
+handle_append() {
+  local site file css matches
+  site=$(jq -r '.site // empty' <<<"$1" | tr -cd 'a-z0-9.-')
+  css=$(jq -r '.css // empty' <<<"$1")
+  [[ -n $site && -n $css ]] || return 0
+  file="$SITES_DIR/$site.css"
+  if [[ ! -f $file ]]; then
+    matches=$(jq -r '(.matches // []) | join(", ")' <<<"$1")
+    [[ -n $matches ]] || matches="*://$site/*"
+    printf '/* @match %s */\n' "$matches" >"$file"
+  fi
+  printf '\n%s\n' "$css" >>"$file"
+}
+
+# Headless generation command: a shell line that reads the prompt on stdin and
+# prints CSS on stdout. ~/.config/omatheme/agent overrides; otherwise the slug
+# from omarchy-default-agent picks the spelling, since omarchy-agent itself
+# only knows interactive TUI launches. Agents are mise-installed, and the shims
+# dir is already on PATH.
+agent_command() {
+  if [[ -s $CONFIG_DIR/agent ]]; then
+    head -1 "$CONFIG_DIR/agent"
+    return 0
+  fi
+  case "$(omarchy-default-agent 2>/dev/null || echo claude)" in
+    claude | "") echo 'claude -p "$(cat)"' ;;
+    codex) echo 'codex exec "$(cat)"' ;;
+    opencode) echo 'opencode run "$(cat)"' ;;
+    crush) echo 'crush run "$(cat)"' ;;
+    grok) echo 'grok -p "$(cat)"' ;;
+    *) return 1 ;;
+  esac
+}
+
+build_prompt() { # url site census
+  cat <<EOF
+You are Omatheme's stylesheet generator. Write a site stylesheet that retints the page below with the Omarchy desktop palette.
+
+Output rules:
+- Output ONLY raw CSS. No markdown fences, no commentary before or after.
+- First line: /* @match <match patterns, comma separated> */ scoping the style (default: *://$2/*).
+- Every color must come from var(--omarchy-*) (the extension sets them on :root), using color-mix(in srgb, ...) for derived shades. Never hardcode palette values.
+- The extension stamps data-omarchy-mode="dark|light" on <html>; scope mode-specific rules with :root[data-omarchy-mode="light"] etc. and handle both modes.
+- The stylesheet is injected into the document AND into every open shadow root. Declare design-token overrides on both ":root" and ":host" so they win inside web components; plain element/class rules also apply within shadow trees.
+- Selector durability: prefer ids and short stable class names; never use auto-generated or randomized class names (long, digit-heavy, or hash-like).
+- Use !important where the site's own rules would otherwise win.
+- Restyle the site chrome (navigation, toolbars, lists, menus, surfaces, text). Leave embedded user content alone (documents, HTML email bodies, user images).
+- Icon sprites that clash with the new backgrounds: prefer CSS filters (invert/brightness), scoped per mode.
+
+Palette keys with their current values (values change with the desktop theme, so always reference the vars; the values are only for judging contrast):
+$(omarchy-theme-color --all)
+
+Target page: $1
+Census of the rendered page (element clusters by computed color/background, with counts and sample selectors):
+$3
+
+If a file named sites/gmail.css exists in the current directory, you may read it as an example of the house style.
+EOF
+}
+
+handle_generate() {
+  local url site census
+  url=$(jq -r '.url // empty' <<<"$1")
+  site=$(jq -r '.site // empty' <<<"$1" | tr -cd 'a-z0-9.-')
+  census=$(jq -c '.census // {}' <<<"$1")
+  [[ -n $site ]] || return 0
+  (
+    exec 8>"$GENLOCK"
+    if ! flock -n 8; then
+      send_status "$site" error "another generation is already running"
+      exit 0
+    fi
+    local cmd css
+    if ! cmd=$(agent_command); then
+      send_status "$site" error "no headless spelling for agent '$(omarchy-default-agent 2>/dev/null)' — put a command in ~/.config/omatheme/agent (prompt on stdin, CSS on stdout)"
+      exit 0
+    fi
+    if ! command -v "${cmd%% *}" >/dev/null; then
+      send_status "$site" error "agent command '${cmd%% *}' not found"
+      exit 0
+    fi
+    local agent_name out pid start
+    agent_name=$(basename "${cmd%% *}")
+    send_status "$site" running "asking $agent_name for a stylesheet"
+    out=$(mktemp "${XDG_RUNTIME_DIR:-/tmp}/omatheme-gen.XXXXXX")
+    (cd "$REPO" && build_prompt "$url" "$site" "$census" | timeout 600 bash -c "$cmd" >"$out" 2>/dev/null) &
+    pid=$!
+    start=$SECONDS
+    while kill -0 "$pid" 2>/dev/null; do
+      sleep 5
+      kill -0 "$pid" 2>/dev/null || break
+      send_status "$site" running "$agent_name is working… $((SECONDS - start))s"
+    done
+    wait "$pid"
+    css=$(sed '/^```/d' "$out")
+    rm -f "$out"
+    if [[ $css != *"--omarchy-"* || $css != *"{"* ]]; then
+      send_status "$site" error "agent returned no usable CSS"
+      notify-send "Omatheme" "Theme generation for $site failed" 2>/dev/null
+      exit 0
+    fi
+    grep -q '@match' <<<"$css" || css=$(printf '/* @match *://%s/* */\n%s' "$site" "$css")
+    printf '%s\n' "$css" >"$SITES_DIR/$site.css"
+    send_status "$site" done "wrote sites/$site.css"
+    notify-send "Omatheme" "Generated theme for $site" 2>/dev/null
+  ) &
+}
+
+# Launch the user's default agent in a floating terminal, pointed at the
+# site's stylesheet with fresh page context on disk. The terminal is the
+# progress UI; the live styles push is the preview.
+handle_agent() {
+  local url site census shot ctx verb prompt
+  url=$(jq -r '.url // empty' <<<"$1")
+  site=$(jq -r '.site // empty' <<<"$1" | tr -cd 'a-z0-9.-')
+  [[ -n $site ]] || return 0
+  if [[ -z $(omarchy-default-agent 2>/dev/null) ]]; then
+    send_status "$site" error "no default agent — set one with: omarchy default agent <name>"
+    return 0
+  fi
+  ctx="$CONFIG_DIR/context/$site"
+  mkdir -p "$ctx"
+  jq -c '.census // {}' <<<"$1" | jq . >"$ctx/census.json"
+  printf '%s\n' "$url" >"$ctx/url"
+  shot=$(jq -r '.screenshot // empty' <<<"$1")
+  if [[ $shot == data:image/*';base64,'* ]]; then
+    printf '%s' "${shot#*;base64,}" | base64 -d >"$ctx/page.jpg" 2>/dev/null || rm -f "$ctx/page.jpg"
+  fi
+  verb="create"
+  [[ -f $SITES_DIR/$site.css ]] && verb="refine"
+  prompt="Read $CONFIG_DIR/AGENT.md first and follow it. Then $verb the Omatheme stylesheet for $url at $SITES_DIR/$site.css. Fresh page context (census.json, page.jpg, url) is in $ctx. If you have browser tools (MCP), inspect the live page and the site's other page types directly; the context files are the fallback. Your saves restyle the user's open tabs live."
+  setsid -f omarchy-agent-prompt "$prompt" </dev/null >/dev/null 2>&1
+  send_status "$site" done "agent terminal launched"
+}
+
+handle_message() {
+  local type
+  type=$(jq -r '.type // empty' <<<"$1" 2>/dev/null)
+  case $type in
+    append) handle_append "$1" ;;
+    generate) handle_generate "$1" ;;
+    agent) handle_agent "$1" ;;
+  esac
 }
 
 send_palette
+send_styles
 
 # theme.name is written after the atomic theme-dir swap, so it marks a completed
 # theme change; the sleep lets the slower per-app retints land before we resend.
-inotifywait -mq -e close_write --format '%f' "$HOME/.local/state/omarchy/current" |
-  while read -r changed; do
-    if [[ $changed == "theme.name" ]]; then
-      sleep 0.2
-      send_palette
-    fi
-  done
+(
+  inotifywait -mq -e close_write,moved_to,create,delete --format '%w%f' \
+    "$STATE_DIR" "$SITES_DIR" |
+    while read -r changed; do
+      case $changed in
+        "$STATE_DIR/theme.name")
+          sleep 0.2
+          send_palette
+          ;;
+        "$SITES_DIR/"*.css)
+          sleep 0.2
+          send_styles
+          ;;
+      esac
+    done
+) &
+WATCHER=$!
+
+# Blocks on stdin; EOF means the browser closed the port, and the trap reaps
+# the watcher (in-flight generations finish and die on their next write).
+while msg=$(read_message) && [[ -n $msg ]]; do
+  handle_message "$msg"
+done

@@ -19,6 +19,23 @@ for dir in "${browser_dirs[@]}"; do
   fi
 done
 
+# Seed the user styles dir with the bundled starters (never overwriting local
+# edits); the host watches this dir and pushes changes live.
+mkdir -p "$HOME/.config/omatheme/sites"
+for f in "$REPO"/sites/*.css; do
+  [[ -f $f ]] || continue
+  dest="$HOME/.config/omatheme/sites/$(basename "$f")"
+  [[ -f $dest ]] || cp "$f" "$dest"
+done
+
+# The agent guide is ours to keep current — always refreshed. The Claude skill
+# is a thin pointer at it, linked in only when Claude Code is around.
+cp -f "$REPO/AGENT.md" "$HOME/.config/omatheme/AGENT.md"
+if [[ -d $HOME/.claude ]]; then
+  mkdir -p "$HOME/.claude/skills"
+  ln -sfn "$REPO/skill" "$HOME/.claude/skills/omatheme"
+fi
+
 # Join Helium's --load-extension list rather than adding a second line: Chromium
 # takes the last occurrence of a repeated switch, which would drop copy-url.
 FLAGS="$HOME/.config/helium-browser-flags.conf"
