@@ -1,0 +1,55 @@
+#!/bin/bash
+set -euo pipefail
+
+# Removes everything ./install put outside this repo, except the user's own site
+# stylesheets — those are hand-edited work and are only pointed at, never
+# deleted. --purge removes them too.
+REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+HOST_NAME="com.mckible.umber"
+CONFIG_DIR="$HOME/.config/umber"
+
+PURGE=no
+for arg in "$@"; do
+  case $arg in
+    --purge) PURGE=yes ;;
+    *)
+      echo "usage: ./uninstall [--purge]" >&2
+      exit 2
+      ;;
+  esac
+done
+
+for dir in "$HOME/.config/net.imput.helium" "$HOME/.config/chromium" "$HOME/.config/google-chrome"; do
+  f="$dir/NativeMessagingHosts/$HOST_NAME.json"
+  if [[ -f $f ]]; then
+    rm -f "$f"
+    echo "  removed $f"
+  fi
+done
+
+FLAGS="$HOME/.config/helium-browser-flags.conf"
+if [[ -f $FLAGS ]] && grep -q "umber/extension" "$FLAGS"; then
+  sed -i -E "s|,?$(printf '%s' "$REPO/extension" | sed 's/[][\.*^$/|]/\\&/g')||" "$FLAGS"
+  sed -i '/^--load-extension=$/d' "$FLAGS"
+  echo "  removed the extension from $FLAGS"
+fi
+
+link="$HOME/.claude/skills/umber"
+if [[ -L $link ]]; then
+  rm -f "$link"
+  echo "  removed $link"
+fi
+
+rm -f "$CONFIG_DIR/AGENT.md"
+
+if [[ $PURGE == yes ]]; then
+  rm -rf "$CONFIG_DIR"
+  echo "  removed $CONFIG_DIR, site stylesheets included"
+elif [[ -d $CONFIG_DIR/sites ]]; then
+  echo
+  echo "Your site stylesheets are still in $CONFIG_DIR/sites — delete that dir, or"
+  echo "re-run with --purge, to remove them too."
+fi
+
+echo
+echo "Uninstalled. Remove the extension in chrome://extensions and restart the browser."

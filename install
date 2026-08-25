@@ -1,10 +1,43 @@
 #!/bin/bash
 set -euo pipefail
 
-# pwd -P: a caller arriving through a symlinked path (e.g. a compat symlink
-# left after a repo rename) must not embed the symlink into the host manifest.
+# Installs the native messaging host manifest and seeds the site styles dir.
+#
+# Two steps reach past Umber's own files — the browser flags line that loads the
+# unpacked extension, and the Claude skill symlink. Those touch configuration
+# Umber does not own, so they are asked for rather than assumed, and skipped
+# outright when there is no terminal to ask at. --yes takes every step,
+# --no-optional takes none of them.
+#
+# pwd -P: a caller arriving through a symlinked path (e.g. a compat symlink left
+# after a repo rename) must not embed the symlink into the host manifest.
 REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 HOST_NAME="com.mckible.umber"
+CONFIG_DIR="$HOME/.config/umber"
+
+ASSUME=ask
+for arg in "$@"; do
+  case $arg in
+    -y | --yes) ASSUME=yes ;;
+    --no-optional) ASSUME=no ;;
+    *)
+      echo "usage: ./install [--yes | --no-optional]" >&2
+      exit 2
+      ;;
+  esac
+done
+
+# confirm PROMPT — true only on an explicit yes.
+confirm() {
+  case $ASSUME in
+    yes) return 0 ;;
+    no) return 1 ;;
+  esac
+  [[ -t 0 ]] || return 1
+  local reply
+  read -r -p "$1 [y/N] " reply
+  [[ $reply == [yY]* ]]
+}
 
 browser_dirs=(
   "$HOME/.config/net.imput.helium"
@@ -14,39 +47,73 @@ browser_dirs=(
 
 manifest=$(sed "s|__HOST_PATH__|$REPO/host/umber-host|" "$REPO/host/$HOST_NAME.json")
 
+installed=0
 for dir in "${browser_dirs[@]}"; do
   if [[ -d $dir ]]; then
     mkdir -p "$dir/NativeMessagingHosts"
-    printf '%s\n' "$manifest" >"$dir/NativeMessagingHosts/$HOST_NAME.json"
+    # Written through a fresh temp file and renamed into place, so a link left
+    # at the destination is replaced rather than written through.
+    tmp=$(mktemp "$dir/NativeMessagingHosts/.$HOST_NAME.XXXXXX")
+    printf '%s\n' "$manifest" >"$tmp"
+    chmod 644 "$tmp"
+    mv -f "$tmp" "$dir/NativeMessagingHosts/$HOST_NAME.json"
+    echo "  native host manifest → $dir/NativeMessagingHosts/$HOST_NAME.json"
+    installed=$((installed + 1))
   fi
 done
+((installed)) || echo "  no Chromium-family browser config dir found — nothing to pair with yet"
 
 # Seed the user styles dir with the bundled starters (never overwriting local
 # edits); the host watches this dir and pushes changes live.
-mkdir -p "$HOME/.config/umber/sites"
+mkdir -p "$CONFIG_DIR/sites"
 for f in "$REPO"/sites/*.css; do
   [[ -f $f ]] || continue
-  dest="$HOME/.config/umber/sites/$(basename "$f")"
-  [[ -f $dest ]] || cp "$f" "$dest"
+  dest="$CONFIG_DIR/sites/$(basename "$f")"
+  if [[ ! -e $dest ]]; then
+    cp "$f" "$dest"
+    echo "  starter stylesheet → $dest"
+  fi
 done
 
-# The agent guide is ours to keep current — always refreshed. The Claude skill
-# is a thin pointer at it, linked in only when Claude Code is around.
-cp -f "$REPO/AGENT.md" "$HOME/.config/umber/AGENT.md"
-if [[ -d $HOME/.claude ]]; then
-  mkdir -p "$HOME/.claude/skills"
-  ln -sfn "$REPO/skill" "$HOME/.claude/skills/umber"
-fi
+# The agent guide is Umber's own file inside Umber's own config dir, so it is
+# always refreshed.
+cp -f "$REPO/AGENT.md" "$CONFIG_DIR/AGENT.md"
 
-# Join Helium's --load-extension list rather than adding a second line: Chromium
-# takes the last occurrence of a repeated switch, which would drop copy-url.
+# --- steps that touch configuration Umber does not own ----------------------
+
 FLAGS="$HOME/.config/helium-browser-flags.conf"
 if [[ -f $FLAGS ]] && ! grep -q "umber/extension" "$FLAGS"; then
-  if grep -q -- "^--load-extension=" "$FLAGS"; then
-    sed -i "s|^--load-extension=.*|&,$REPO/extension|" "$FLAGS"
+  echo
+  echo "Helium loads unpacked extensions from a flags file. Umber can add itself to it:"
+  echo "  $FLAGS  →  --load-extension=…,$REPO/extension"
+  if confirm "Edit $FLAGS?"; then
+    # Join the existing --load-extension list rather than adding a second line:
+    # Chromium takes the last occurrence of a repeated switch, which would drop
+    # whatever the first one loaded.
+    cp -f "$FLAGS" "$FLAGS.umber-backup"
+    if grep -q -- "^--load-extension=" "$FLAGS"; then
+      sed -i "s|^--load-extension=.*|&,$REPO/extension|" "$FLAGS"
+    else
+      printf -- '--load-extension=%s\n' "$REPO/extension" >>"$FLAGS"
+    fi
+    echo "  edited (previous contents kept at $FLAGS.umber-backup)"
   else
-    printf -- '--load-extension=%s\n' "$REPO/extension" >>"$FLAGS"
+    echo "  skipped — load extension/ yourself via chrome://extensions (Developer mode → Load unpacked)"
   fi
 fi
 
-echo "Installed. Restart Helium to load the extension."
+if [[ -d $HOME/.claude ]] && [[ ! -e $HOME/.claude/skills/umber ]]; then
+  echo
+  echo "Umber ships a Claude Code skill for editing site stylesheets:"
+  echo "  $HOME/.claude/skills/umber  →  $REPO/skill"
+  if confirm "Link it?"; then
+    mkdir -p "$HOME/.claude/skills"
+    ln -sfn "$REPO/skill" "$HOME/.claude/skills/umber"
+    echo "  linked"
+  else
+    echo "  skipped"
+  fi
+fi
+
+echo
+echo "Installed. Restart the browser to load the extension. Remove with ./uninstall."
