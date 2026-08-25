@@ -1,0 +1,246 @@
+/* Omarchy palette for Gmail. Forces both surfaces and text so Gmail's internal
+   light/dark setting stops mattering. Selectors verified against the live DOM
+   2026-08-24: Gmail's short classnames (.zA, .aeN, .T-I) are long-stable; the
+   volatile gb_* classes are avoided in favor of #gb / #aso_search_form_anchor.
+   HTML message bodies (.a3s descendants) keep their authored colors. */
+
+:root {
+  scrollbar-color: var(--omarchy-muted) transparent;
+}
+
+/* Frame */
+body,
+.nH,
+.wl {
+  background-color: var(--omarchy-background, inherit) !important;
+}
+
+/* Top bar and search */
+#gb {
+  background-color: var(--omarchy-background) !important;
+}
+
+#gb svg {
+  fill: color-mix(in srgb, var(--omarchy-foreground) 75%, var(--omarchy-background)) !important;
+}
+
+#aso_search_form_anchor,
+#aso_search_form_anchor td {
+  background-color: var(--omarchy-lighter-background) !important;
+}
+
+#aso_search_form_anchor input {
+  background: transparent !important;
+  color: var(--omarchy-foreground) !important;
+}
+
+#aso_search_form_anchor input::placeholder {
+  color: color-mix(in srgb, var(--omarchy-foreground) 55%, var(--omarchy-background)) !important;
+}
+
+#aso_search_form_anchor button svg {
+  fill: color-mix(in srgb, var(--omarchy-foreground) 75%, var(--omarchy-background)) !important;
+}
+
+/* Search refinement chips */
+.aqn [role="button"] {
+  color: var(--omarchy-foreground) !important;
+}
+
+/* Left nav (also the collapsed mini rail — same .aeN container) */
+.aeN {
+  background-color: var(--omarchy-background, inherit) !important;
+}
+
+.aeN .Xa {
+  background-color: transparent !important;
+}
+
+.TK .TO .nU,
+.aim .nU {
+  color: var(--omarchy-foreground) !important;
+}
+
+.TO.nZ {
+  background-color: var(--omarchy-lighter-background) !important;
+}
+
+.TO.nZ .nU {
+  color: var(--omarchy-accent) !important;
+}
+
+/* The visible nav text is an <a> inside .nU carrying Gmail's own theme color */
+.TO .nU a {
+  color: inherit !important;
+}
+
+.TO .bsU {
+  color: color-mix(in srgb, var(--omarchy-foreground) 70%, var(--omarchy-background)) !important;
+}
+
+/* Mini-rail labels (Mail/Chat), "Labels" heading, list position counter */
+.apW {
+  color: color-mix(in srgb, var(--omarchy-foreground) 80%, var(--omarchy-background)) !important;
+}
+
+.aWk {
+  color: color-mix(in srgb, var(--omarchy-foreground) 70%, var(--omarchy-background)) !important;
+}
+
+.Dj {
+  color: color-mix(in srgb, var(--omarchy-foreground) 60%, var(--omarchy-background)) !important;
+}
+
+/* Compose button */
+.T-I.T-I-KE.L3 {
+  background-color: var(--omarchy-accent) !important;
+  color: var(--omarchy-background) !important;
+  box-shadow: none !important;
+}
+
+/* Thread list */
+.AO,
+.Cp,
+.ae4 {
+  background-color: var(--omarchy-background) !important;
+}
+
+.zA.yO {
+  background-color: var(--omarchy-background) !important;
+}
+
+.zA.zE {
+  background-color: var(--omarchy-lighter-background) !important;
+}
+
+.zA .yW,
+.zA .y6,
+.zA .bog {
+  color: var(--omarchy-foreground) !important;
+}
+
+.zA.yO .yW,
+.zA.yO .y6,
+.zA.yO .bog,
+.zA .y2 {
+  color: color-mix(in srgb, var(--omarchy-foreground) 70%, var(--omarchy-background)) !important;
+}
+
+.zA .xW,
+.zA .xW span {
+  color: color-mix(in srgb, var(--omarchy-foreground) 55%, var(--omarchy-background)) !important;
+}
+
+.zA.zE .xW span {
+  color: var(--omarchy-foreground) !important;
+}
+
+.zA:hover {
+  background-color: color-mix(in srgb, var(--omarchy-lighter-background) 92%, var(--omarchy-foreground)) !important;
+}
+
+.zA.x7 {
+  background-color: color-mix(in srgb, var(--omarchy-background) 88%, var(--omarchy-accent)) !important;
+}
+
+/* List toolbar */
+.G-atb,
+.aeH {
+  background-color: var(--omarchy-background) !important;
+  border-color: var(--omarchy-muted) !important;
+}
+
+/* Conversation view — Gmail keeps this surface light even in its dark theme,
+   so text must be forced along with the background. */
+.hP,
+.gD {
+  color: var(--omarchy-foreground) !important;
+}
+
+.go,
+.g2,
+.gI span,
+.hb,
+.g3 {
+  color: color-mix(in srgb, var(--omarchy-foreground) 60%, var(--omarchy-background)) !important;
+}
+
+.a3s {
+  color: var(--omarchy-foreground) !important;
+}
+
+.adn {
+  background-color: transparent !important;
+}
+
+/* Reply / Forward strip */
+.amn {
+  background-color: var(--omarchy-background) !important;
+}
+
+.amn .ams {
+  color: var(--omarchy-foreground) !important;
+  border-color: var(--omarchy-muted) !important;
+  background-color: var(--omarchy-lighter-background) !important;
+}
+
+/* "No new mail!" banner — Gmail hardcodes rgba(51,51,51,.8) in both its themes */
+.TD {
+  background-color: color-mix(in srgb, var(--omarchy-lighter-background) 85%, transparent) !important;
+}
+
+.TC {
+  color: var(--omarchy-foreground) !important;
+}
+
+/* Search refinement chips (the .aqn rule above misses these; chips live in .S0) */
+.S0 .HW {
+  background-color: var(--omarchy-lighter-background) !important;
+  border-color: var(--omarchy-muted) !important;
+  color: var(--omarchy-foreground) !important;
+}
+
+.S0 .HW .H5 {
+  color: var(--omarchy-foreground) !important;
+}
+
+/* Dropdown menus */
+.J-M {
+  background-color: var(--omarchy-lighter-background) !important;
+  border-color: var(--omarchy-muted) !important;
+}
+
+.J-M .J-N {
+  color: var(--omarchy-foreground) !important;
+}
+
+.J-M .J-N-JT {
+  background-color: color-mix(in srgb, var(--omarchy-lighter-background) 88%, var(--omarchy-foreground)) !important;
+}
+
+/* Quick settings drawer */
+.IU {
+  background-color: color-mix(in srgb, var(--omarchy-background) 96%, var(--omarchy-foreground)) !important;
+}
+
+.IU :is(div, span, label, h2) {
+  color: var(--omarchy-foreground) !important;
+}
+
+.IU a,
+.IU [role="link"] {
+  color: var(--omarchy-accent) !important;
+}
+
+/* Gmail's internal Dark theme (the assumed setting) ships white icon sprites,
+   invisible on light Omarchy palettes — invert them when the Omarchy mode
+   (attribute set by content.js) is light. The starred (gold) star is excluded.
+   With Gmail internally set to light, this inverts the wrong way; keep Gmail
+   on Dark. */
+:root[data-omarchy-mode="light"] .oZ-jc.T-Jo,
+:root[data-omarchy-mode="light"] .T-KT:not(.T-KT-Jp) .T-KT-JX,
+:root[data-omarchy-mode="light"] .bqX,
+:root[data-omarchy-mode="light"] .TK .qj,
+:root[data-omarchy-mode="light"] .G-atb .T-I-J3 {
+  filter: invert(1);
+}

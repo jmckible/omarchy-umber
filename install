@@ -1,0 +1,33 @@
+#!/bin/bash
+set -euo pipefail
+
+REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+HOST_NAME="com.omarchy.theme"
+
+browser_dirs=(
+  "$HOME/.config/net.imput.helium"
+  "$HOME/.config/chromium"
+  "$HOME/.config/google-chrome"
+)
+
+manifest=$(sed "s|__HOST_PATH__|$REPO/host/omatheme-host|" "$REPO/host/$HOST_NAME.json")
+
+for dir in "${browser_dirs[@]}"; do
+  if [[ -d $dir ]]; then
+    mkdir -p "$dir/NativeMessagingHosts"
+    printf '%s\n' "$manifest" >"$dir/NativeMessagingHosts/$HOST_NAME.json"
+  fi
+done
+
+# Join Helium's --load-extension list rather than adding a second line: Chromium
+# takes the last occurrence of a repeated switch, which would drop copy-url.
+FLAGS="$HOME/.config/helium-browser-flags.conf"
+if [[ -f $FLAGS ]] && ! grep -q "omatheme/extension" "$FLAGS"; then
+  if grep -q -- "^--load-extension=" "$FLAGS"; then
+    sed -i "s|^--load-extension=.*|&,$REPO/extension|" "$FLAGS"
+  else
+    printf -- '--load-extension=%s\n' "$REPO/extension" >>"$FLAGS"
+  fi
+fi
+
+echo "Installed. Restart Helium to load the extension."

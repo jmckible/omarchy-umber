@@ -1,0 +1,29 @@
+#!/bin/bash
+# Native messaging host: stream the Omarchy palette to the Omatheme extension.
+# Speaks the Chromium native messaging protocol on stdout (4-byte LE length + JSON).
+# Exits via SIGPIPE when the browser closes the port.
+
+export PATH="/usr/local/bin:/usr/bin:$PATH"
+
+send_palette() {
+  local json len
+  json=$(omarchy-theme-color --all 2>/dev/null |
+    jq -Rcn '{colors: ([inputs | select(length > 0) | split("\t") | {(.[0]): .[1]}] | add)}')
+  [[ -n $json ]] || return 0
+
+  len=${#json}
+  printf "$(printf '\\x%02x\\x%02x\\x%02x\\x%02x' $((len & 255)) $((len >> 8 & 255)) $((len >> 16 & 255)) $((len >> 24 & 255)))"
+  printf '%s' "$json"
+}
+
+send_palette
+
+# theme.name is written after the atomic theme-dir swap, so it marks a completed
+# theme change; the sleep lets the slower per-app retints land before we resend.
+inotifywait -mq -e close_write --format '%f' "$HOME/.local/state/omarchy/current" |
+  while read -r changed; do
+    if [[ $changed == "theme.name" ]]; then
+      sleep 0.2
+      send_palette
+    fi
+  done
