@@ -86,16 +86,33 @@ const syncSheets = () => {
   }
 }
 
+const shadowObserver = new MutationObserver(muts => {
+  for (const m of muts)
+    for (const n of m.addedNodes) if (n instanceof Element) scanForShadows(n)
+})
+
 const trackRoot = root => {
   if (!root || shadowRoots.has(root)) return
   shadowRoots.add(root)
+  // Observation doesn't cross shadow boundaries, so each root is watched
+  // itself — components hydrated inside other components are still found.
+  shadowObserver.observe(root, { childList: true, subtree: true })
   if (activeSheetList.length) adoptInto(root, activeSheetList)
 }
 
+// Walks a subtree — document, element, or shadow root — descending into every
+// open shadow root found, since declarative roots nested inside other
+// components never fire the attachShadow hook.
 const scanForShadows = node => {
-  if (node.shadowRoot) trackRoot(node.shadowRoot)
-  if (node.childElementCount)
-    for (const el of node.querySelectorAll("*")) if (el.shadowRoot) trackRoot(el.shadowRoot)
+  if (node.shadowRoot) {
+    trackRoot(node.shadowRoot)
+    scanForShadows(node.shadowRoot)
+  }
+  for (const el of node.querySelectorAll("*"))
+    if (el.shadowRoot) {
+      trackRoot(el.shadowRoot)
+      scanForShadows(el.shadowRoot)
+    }
 }
 
 // Imperative roots, announced by the MAIN-world attachShadow hook.
@@ -105,10 +122,7 @@ addEventListener("umber-shadow", e => {
 
 // Declarative roots: attached during parsing without attachShadow, so find
 // them by scanning added subtrees (and everything present once loaded).
-new MutationObserver(muts => {
-  for (const m of muts)
-    for (const n of m.addedNodes) if (n instanceof Element) scanForShadows(n)
-}).observe(document, { childList: true, subtree: true })
+shadowObserver.observe(document, { childList: true, subtree: true })
 if (document.readyState === "loading")
   addEventListener("DOMContentLoaded", () => scanForShadows(document.documentElement))
 else scanForShadows(document.documentElement)

@@ -1,7 +1,9 @@
 #!/bin/bash
 set -euo pipefail
 
-REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# pwd -P: a caller arriving through a symlinked path (e.g. a compat symlink
+# left after a repo rename) must not embed the symlink into the host manifest.
+REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 HOST_NAME="com.mckible.umber"
 
 browser_dirs=(
