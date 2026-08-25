@@ -1,23 +1,5 @@
 const $ = id => document.getElementById(id)
 
-// Same shorthand-tolerant match patterns as content.js.
-const escapeRe = s => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-const patternRe = raw => {
-  let p = raw.trim()
-  if (p === "<all_urls>") return /^(https?|file|ftp):/
-  if (!p.includes("://")) p = "*://" + p + (p.includes("/") ? "" : "/*")
-  const m = /^(\*|https?|file|ftp):\/\/([^/]*)(\/.*)?$/.exec(p)
-  if (!m) return null
-  let src = "^" + (m[1] === "*" ? "https?" : m[1]) + "://"
-  if (m[2] === "*") src += "[^/]*"
-  else if (m[2].startsWith("*.")) src += "(?:[^/]+\\.)?" + escapeRe(m[2].slice(2))
-  else src += escapeRe(m[2])
-  src += (m[3] || "/*").split("*").map(escapeRe).join(".*") + "$"
-  try { return new RegExp(src) } catch { return null }
-}
-const matchesUrl = (patterns, url) =>
-  Array.isArray(patterns) && patterns.some(p => patternRe(p)?.test(url))
-
 const renderGenerate = gen => {
   const el = $("gen-status")
   el.classList.toggle("error", gen?.status === "error")
@@ -35,6 +17,11 @@ const init = async () => {
   const site = themable ? new URL(url).hostname : null
 
   const v = await chrome.storage.local.get(["omarchyColors", "omarchyStyles", "omarchyEnabled", "omarchyConnected", "omarchyGenerate"])
+
+  // The stylesheet already covering this URL, if any — the file the agent
+  // should refine instead of forking a hostname-named second one. Kept fresh
+  // because a generation landing while the popup is open changes the answer.
+  let owner = Umber.resolveStyle(v.omarchyStyles, url)
 
   // Theme the popup itself with the live palette.
   const paint = colors => {
@@ -59,7 +46,7 @@ const init = async () => {
     $("styles").replaceChildren(...(styles || []).map(s => {
       const li = document.createElement("li")
       li.textContent = s.name
-      if (themable && matchesUrl(s.matches, url)) li.classList.add("on")
+      if (themable && Umber.matchesUrl(s.matches, url)) li.classList.add("on")
       return li
     }))
   }
@@ -75,13 +62,15 @@ const init = async () => {
 
   // Launches the default agent in a floating terminal via the host, seeded
   // with a context dump of this page (census + screenshot). The terminal is
-  // the progress UI; the live styles push previews every save.
+  // the progress UI; the live styles push previews every save. `site` names the
+  // stylesheet, not the host: the file already claiming this URL when there is
+  // one, so the host reads it as a refine rather than a fresh create.
   $("generate").addEventListener("click", async () => {
     $("generate").disabled = true
     const census = await chrome.tabs.sendMessage(tab.id, "umber-census").catch(() => null)
     const screenshot = await chrome.tabs.captureVisibleTab(null, { format: "jpeg", quality: 60 }).catch(() => null)
     const resp = await chrome.runtime.sendMessage({
-      toHost: { type: "agent", url, site, census: census || {}, screenshot },
+      toHost: { type: "agent", url, site: owner?.name || site, census: census || {}, screenshot },
     }).catch(e => ({ ok: false, error: String(e) }))
     if (resp?.ok) window.close()
     else {
@@ -94,7 +83,10 @@ const init = async () => {
     if (area !== "local") return
     if (changes.omarchyColors) paint(changes.omarchyColors.newValue)
     if (changes.omarchyConnected) renderHost(changes.omarchyConnected.newValue)
-    if (changes.omarchyStyles) renderStyles(changes.omarchyStyles.newValue)
+    if (changes.omarchyStyles) {
+      owner = Umber.resolveStyle(changes.omarchyStyles.newValue, url)
+      renderStyles(changes.omarchyStyles.newValue)
+    }
     if (changes.omarchyGenerate) {
       renderGenerate(changes.omarchyGenerate.newValue)
       if (changes.omarchyGenerate.newValue?.status !== "running") $("generate").disabled = !themable

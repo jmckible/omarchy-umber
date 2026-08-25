@@ -7,38 +7,9 @@ const root = document.documentElement
 const state = { colors: null, styles: [], enabled: true }
 const sheets = new Map() // style name → CSSStyleSheet
 const ownSheets = new Set()
-const patternCache = new Map()
 
-const escapeRe = s => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-
-// Chromium match patterns, plus a shorthand: a bare "mail.google.com" or
-// "mail.google.com/u/*" is treated as *://host/path.
-const compilePattern = raw => {
-  if (patternCache.has(raw)) return patternCache.get(raw)
-  let p = raw.trim()
-  let re = null
-  if (p === "<all_urls>") re = /^(https?|file|ftp):/
-  else {
-    if (!p.includes("://")) p = "*://" + p + (p.includes("/") ? "" : "/*")
-    const m = /^(\*|https?|file|ftp):\/\/([^/]*)(\/.*)?$/.exec(p)
-    if (m) {
-      const scheme = m[1] === "*" ? "https?" : m[1]
-      const host = m[2]
-      const path = m[3] || "/*"
-      let src = "^" + scheme + "://"
-      if (host === "*") src += "[^/]*"
-      else if (host.startsWith("*.")) src += "(?:[^/]+\\.)?" + escapeRe(host.slice(2))
-      else src += escapeRe(host)
-      src += path.split("*").map(escapeRe).join(".*") + "$"
-      try { re = new RegExp(src) } catch { re = null }
-    }
-  }
-  patternCache.set(raw, re)
-  return re
-}
-
-const matchesUrl = (patterns, url) =>
-  Array.isArray(patterns) && patterns.some(p => compilePattern(p)?.test(url))
+// Match-pattern logic lives in match.js (Umber.matchesUrl), shared with the
+// popup and the picker so all three agree on which stylesheet owns a URL.
 
 const setPalette = () => {
   if (state.enabled && state.colors) {
@@ -66,7 +37,7 @@ const adoptInto = (target, activeSheets) => {
 }
 
 const syncSheets = () => {
-  const active = state.enabled ? state.styles.filter(s => matchesUrl(s.matches, location.href)) : []
+  const active = state.enabled ? state.styles.filter(s => Umber.matchesUrl(s.matches, location.href)) : []
   for (const s of active) {
     let sheet = sheets.get(s.name)
     if (!sheet) {

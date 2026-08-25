@@ -16,6 +16,15 @@
   ]
   const PROPS = { text: "color", background: "background-color", border: "border-color" }
 
+  // The stylesheet whose @match claims this page: where a picked rule appends,
+  // and the name the host reports generation status under. Resolved per use
+  // rather than cached — path-scoped patterns make it a function of the URL,
+  // which soft navigations change under us.
+  const resolveOwner = async () => {
+    const { omarchyStyles } = await chrome.storage.local.get("omarchyStyles")
+    return Umber.resolveStyle(omarchyStyles, location.href)
+  }
+
   let pickHandlers = null
   let panelHost = null
   const previewSheet = new CSSStyleSheet()
@@ -157,13 +166,13 @@
     if (!sticky) toastTimer = setTimeout(() => toastEl.remove(), 7000)
   }
 
-  chrome.storage.onChanged.addListener((changes, area) => {
+  chrome.storage.onChanged.addListener(async (changes, area) => {
     if (area !== "local") return
     // The persisted rule arrives through the normal styles push; drop the
     // temporary preview once it does.
     if (changes.omarchyStyles) clearPreview()
     const gen = changes.omarchyGenerate?.newValue
-    if (gen && gen.site === location.hostname) {
+    if (gen && gen.site === ((await resolveOwner())?.name || location.hostname)) {
       if (gen.status === "running") toast(`Umber: ${gen.detail}`, { sticky: true })
       else if (gen.status === "done") toast(`Umber: ${gen.detail}`)
       else if (gen.status === "error") toast(`Umber: ${gen.detail}`, { error: true })
@@ -309,9 +318,14 @@
 
     q(".cancel").addEventListener("click", () => { clearPreview(); closePanel() })
     q(".save").addEventListener("click", async () => {
-      const site = location.hostname
+      // Append into the file that already claims this URL, falling back to a
+      // hostname-named one only when nothing does — a picked rule must not
+      // fork a second stylesheet beside the site's real theme.
+      const owner = await resolveOwner()
+      const site = owner?.name || location.hostname
+      const matches = owner?.matches || [`*://${location.hostname}/*`]
       const resp = await chrome.runtime.sendMessage({
-        toHost: { type: "append", site, matches: [`*://${site}/*`], css: ruleCss() },
+        toHost: { type: "append", site, matches, css: ruleCss() },
       }).catch(e => ({ ok: false, error: String(e) }))
       if (resp && resp.ok) {
         closePanel() // preview clears when the styles push lands
