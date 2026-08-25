@@ -30,4 +30,4 @@ The user's daily browser is **Helium** (extension loaded via `--load-extension` 
 
 ## Related
 
-- Tier 1 of this concept (the Rails dashboard's server-side theme sync) lives in `~/dev/dashboard/omarchy/` — same palette names, same `theme-set` hook mechanism, independent delivery path.
+- Tier 1 of this concept (the Rails dashboard's server-side theme sync, a `theme-set` hook pushing rendered CSS to the app) was reverted 2026-08-25 in favor of this extension — see dashboard commits `e4f2737` and `502fafc` (the revert) for the palette-to-token mapping it worked out. `~/.config/umber/sites/dashboard.mckible.com.css` is that mapping ported, and the dashboard's `/styleguide` page is the surface to check it against.
