@@ -62,6 +62,12 @@ const hostMessage = msg => {
 // this extension's own contexts — another extension would arrive on
 // onMessageExternal, which is deliberately not registered — but the sender is
 // checked anyway so that stays true if a listener is ever added.
+//
+// Deliberately not backed by an externally_connectable entry in the manifest:
+// with the key absent, web pages cannot connect at all and extensions can only
+// reach onMessageExternal, so a deny-all entry adds nothing — and Chromium
+// warns on one ("specifies neither 'matches' nor 'ids'"). The check below is
+// what actually holds the line.
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (!msg || !msg.toHost) return
   if (sender.id !== chrome.runtime.id) return sendResponse({ ok: false, error: "rejected sender" })

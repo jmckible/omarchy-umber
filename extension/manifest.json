@@ -11,7 +11,6 @@
     "128": "icons/icon128.png"
   },
   "permissions": ["nativeMessaging", "storage", "activeTab"],
-  "externally_connectable": { "ids": [] },
   "background": { "service_worker": "background.js" },
   "action": {
     "default_popup": "popup.html",
