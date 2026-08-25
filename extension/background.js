@@ -19,12 +19,57 @@ function connect() {
   })
 }
 
-// Popup and picker reach the host through here.
+// The extension→host contract, stated once. Everything on the far side of this
+// port runs unsandboxed as the user, and the fields below are shaped by
+// whatever page the picker or the popup was looking at — so a message is
+// rebuilt here from known keys with known types and ceilings rather than
+// forwarded as it arrived. The host re-validates all of it; this is the second
+// lock, not the only one, and it keeps a content-script bug from turning into a
+// file write.
+const LIMIT = { site: 64, css: 8192, url: 2048, census: 262144, screenshot: 11534336 }
+
+const bounded = (v, max) => (typeof v === "string" && v.length > 0 && v.length <= max ? v : null)
+
+const hostMessage = msg => {
+  if (!msg || typeof msg !== "object") return null
+  const site = bounded(msg.site, LIMIT.site)
+  if (!site) return null
+  if (msg.type === "append") {
+    const css = bounded(msg.css, LIMIT.css)
+    return css ? { type: "append", site, css } : null
+  }
+  if (msg.type === "agent") {
+    const url = bounded(msg.url, LIMIT.url)
+    if (!url || !/^https?:\/\//.test(url)) return null
+    let census = {}
+    try {
+      const encoded = JSON.stringify(msg.census ?? {})
+      if (encoded.length <= LIMIT.census) census = JSON.parse(encoded)
+    } catch {}
+    const shot = bounded(msg.screenshot, LIMIT.screenshot)
+    return {
+      type: "agent",
+      url,
+      site,
+      census,
+      screenshot: shot && /^data:image\/(jpeg|png);base64,[A-Za-z0-9+/]*={0,2}$/.test(shot) ? shot : null,
+    }
+  }
+  return null
+}
+
+// Popup and picker reach the host through here. onMessage only ever fires for
+// this extension's own contexts — another extension would arrive on
+// onMessageExternal, which is deliberately not registered — but the sender is
+// checked anyway so that stays true if a listener is ever added.
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (!msg || !msg.toHost) return
+  if (sender.id !== chrome.runtime.id) return sendResponse({ ok: false, error: "rejected sender" })
+  const payload = hostMessage(msg.toHost)
+  if (!payload) return sendResponse({ ok: false, error: "malformed host message" })
   if (!port) return sendResponse({ ok: false, error: "native host disconnected" })
   try {
-    port.postMessage(msg.toHost)
+    port.postMessage(payload)
     sendResponse({ ok: true })
   } catch (e) {
     sendResponse({ ok: false, error: String(e) })

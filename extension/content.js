@@ -11,10 +11,16 @@ const ownSheets = new Set()
 // Match-pattern logic lives in match.js (Umber.matchesUrl), shared with the
 // popup and the picker so all three agree on which stylesheet owns a URL.
 
+// The host already shapes these, but this is what actually names a CSS
+// property on every page, so the shape is re-checked where it is used.
+const PALETTE_KEY = /^[a-z0-9_]{1,40}$/
+
 const setPalette = () => {
   if (state.enabled && state.colors) {
-    for (const [key, value] of Object.entries(state.colors))
+    for (const [key, value] of Object.entries(state.colors)) {
+      if (!PALETTE_KEY.test(key) || typeof value !== "string" || value.length > 64) continue
       root.style.setProperty(`--omarchy-${key.replaceAll("_", "-")}`, value)
+    }
     root.dataset.omarchyMode = state.colors.mode || "dark"
   } else {
     for (const prop of [...root.style]) if (prop.startsWith("--omarchy-")) root.style.removeProperty(prop)
@@ -62,8 +68,13 @@ const shadowObserver = new MutationObserver(muts => {
     for (const n of m.addedNodes) if (n instanceof Element) scanForShadows(n)
 })
 
+// One MutationObserver per tracked root, and "umber-shadow" is an ordinary
+// DOM event a page can dispatch as often as it likes — so the number of roots
+// this page can make us observe is bounded.
+const MAX_SHADOW_ROOTS = 2000
+
 const trackRoot = root => {
-  if (!root || shadowRoots.has(root)) return
+  if (!root || shadowRoots.has(root) || shadowRoots.size >= MAX_SHADOW_ROOTS) return
   shadowRoots.add(root)
   // Observation doesn't cross shadow boundaries, so each root is watched
   // itself — components hydrated inside other components are still found.

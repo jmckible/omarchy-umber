@@ -14,10 +14,22 @@ self.Umber = (() => {
 
   // Chromium match patterns, plus a shorthand: a bare "mail.google.com" or
   // "mail.google.com/u/*" is treated as *://host/path.
+  // A pattern is a string out of a file on disk, and it is compiled into a
+  // regex that runs against every URL on every page load. Bound it before the
+  // regex engine sees it: the source is a run of ".*" per "*", so an
+  // unbounded star count is a backtracking bomb aimed at every navigation.
+  const MAX_PATTERN = 256
+  const MAX_STARS = 8
+
   const compilePattern = raw => {
     if (patternCache.has(raw)) return patternCache.get(raw)
+    if (typeof raw !== "string" || raw.length > MAX_PATTERN) return null
     let p = raw.trim()
     let re = null
+    if ((p.match(/\*/g) || []).length > MAX_STARS) {
+      patternCache.set(raw, null)
+      return null
+    }
     if (p === "<all_urls>") re = /^(https?|file|ftp):/
     else {
       if (!p.includes("://")) p = "*://" + p + (p.includes("/") ? "" : "/*")

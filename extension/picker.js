@@ -42,8 +42,23 @@
     return el
   }
 
-  const varValue = key =>
-    getComputedStyle(document.documentElement).getPropertyValue(`--omarchy-${key}`).trim()
+  // Palette values come from storage — what the native host actually sent —
+  // never from getComputedStyle on the page. A page can beat content.js's
+  // inline custom properties with its own `html { --omarchy-accent: … !important }`
+  // rule, and a custom property carries almost any token sequence, so reading
+  // the computed value would let the page choose the strings this file builds
+  // its own UI out of. safeColor is the second lock: a value that is not
+  // recognisably a colour never reaches a stylesheet at all.
+  let palette = {}
+  chrome.storage.local.get("omarchyColors").then(v => { palette = v.omarchyColors || {} })
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === "local" && changes.omarchyColors) palette = changes.omarchyColors.newValue || {}
+  })
+
+  const COLOR_RE = /^(#[0-9a-fA-F]{3,8}|(?:rgb|rgba|hsl|hsla)\([0-9a-zA-Z.,%\s/+-]{1,64}\)|[a-zA-Z]{1,24})$/
+  const safeColor = v => (typeof v === "string" && COLOR_RE.test(v.trim()) ? v.trim() : "")
+
+  const varValue = key => safeColor(palette[key.replaceAll("-", "_")] ?? palette[key])
 
   // --- selector generation -------------------------------------------------
   // Stable = short, letter-only tokens (Gmail's .zA/.T-I school); anything
@@ -100,9 +115,10 @@
     Object.assign(hl.style, {
       position: "fixed", left: 0, top: 0, width: 0, height: 0,
       pointerEvents: "none", zIndex: 2147483646,
-      background: "color-mix(in srgb, " + accent + " 20%, transparent)",
-      outline: "2px solid " + accent,
+      background: "color-mix(in srgb, var(--u-accent) 20%, transparent)",
+      outline: "2px solid var(--u-accent)",
     })
+    hl.style.setProperty("--u-accent", accent)
     document.documentElement.appendChild(hl)
     const onMove = e => {
       const el = deepTarget(e.clientX, e.clientY)
@@ -158,8 +174,10 @@
     const bg = varValue("lighter-background") || "#333"
     const fg = varValue(error ? "red" : "foreground") || "#eee"
     toastInner.style.cssText = `font: 12px system-ui, sans-serif; padding: 8px 12px; border-radius: 6px;
-      background: ${bg}; color: ${fg}; box-shadow: 0 4px 16px rgba(0,0,0,.35);
-      border: 1px solid color-mix(in srgb, ${fg} 25%, ${bg})`
+      background: var(--u-bg); color: var(--u-fg); box-shadow: 0 4px 16px rgba(0,0,0,.35);
+      border: 1px solid color-mix(in srgb, var(--u-fg) 25%, var(--u-bg))`
+    toastInner.style.setProperty("--u-bg", bg)
+    toastInner.style.setProperty("--u-fg", fg)
     toastInner.textContent = text
     if (!toastEl.isConnected) document.documentElement.appendChild(toastEl)
     clearTimeout(toastTimer)
@@ -197,36 +215,50 @@
     const swatches = KEYS.map(k => ({ key: k, value: varValue(k) })).filter(s => s.value)
     const bg = varValue("background") || "#1e1e2e"
     const fg = varValue("foreground") || "#cdd6f4"
-    const border = "color-mix(in srgb, " + fg + " 25%, " + bg + ")"
+    const accent = varValue("accent") || "#61afef"
+    const err = varValue("red") || "#f66"
+
+    // The stylesheet below is a constant: no value is ever concatenated into
+    // this markup. The palette reaches it as custom properties set on the
+    // shadow host, where a value stays a value — it cannot close the <style>
+    // element and open a tag. (`all: initial` does not reset custom
+    // properties, so they still inherit in.)
+    panelHost.style.setProperty("--u-bg", bg)
+    panelHost.style.setProperty("--u-fg", fg)
+    panelHost.style.setProperty("--u-accent", accent)
+    panelHost.style.setProperty("--u-err", err)
 
     shadow.innerHTML = `
       <style>
         :host { all: initial }
         .panel {
           position: relative; width: 268px; font: 12px system-ui, sans-serif;
-          background: ${bg}; color: ${fg}; border: 1px solid ${border};
+          background: var(--u-bg); color: var(--u-fg);
+          border: 1px solid var(--u-border);
           border-radius: 8px; padding: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.4);
         }
+        .panel, .sw { --u-border: color-mix(in srgb, var(--u-fg) 25%, var(--u-bg)) }
         .sel { width: 100%; box-sizing: border-box; font: 11px monospace; margin: 6px 0;
-          background: color-mix(in srgb, ${fg} 8%, ${bg}); color: ${fg};
-          border: 1px solid ${border}; border-radius: 4px; padding: 4px; }
+          background: color-mix(in srgb, var(--u-fg) 8%, var(--u-bg)); color: var(--u-fg);
+          border: 1px solid var(--u-border); border-radius: 4px; padding: 4px; }
         .row { display: flex; gap: 4px; margin: 6px 0 }
         .row button { flex: 1; font: 11px system-ui; padding: 3px 0; cursor: pointer;
-          background: color-mix(in srgb, ${fg} 8%, ${bg}); color: ${fg};
-          border: 1px solid ${border}; border-radius: 4px; }
-        .row button.on { background: ${varValue("accent") || "#61afef"}; color: ${bg}; border-color: transparent }
+          background: color-mix(in srgb, var(--u-fg) 8%, var(--u-bg)); color: var(--u-fg);
+          border: 1px solid var(--u-border); border-radius: 4px; }
+        .row button.on { background: var(--u-accent); color: var(--u-bg); border-color: transparent }
         .grid { display: grid; grid-template-columns: repeat(9, 1fr); gap: 4px; margin: 8px 0 }
-        .sw { aspect-ratio: 1; border-radius: 4px; cursor: pointer; border: 1px solid ${border} }
-        .sw.on { outline: 2px solid ${fg}; outline-offset: 1px }
+        .sw { aspect-ratio: 1; border-radius: 4px; cursor: pointer; border: 1px solid var(--u-border) }
+        .sw.on { outline: 2px solid var(--u-fg); outline-offset: 1px }
         .foot { display: flex; gap: 6px; justify-content: flex-end; margin-top: 8px }
         .foot button { font: 11px system-ui; padding: 4px 10px; cursor: pointer; border-radius: 4px;
-          border: 1px solid ${border}; background: color-mix(in srgb, ${fg} 8%, ${bg}); color: ${fg} }
-        .foot .save { background: ${varValue("accent") || "#61afef"}; color: ${bg}; border-color: transparent }
+          border: 1px solid var(--u-border);
+          background: color-mix(in srgb, var(--u-fg) 8%, var(--u-bg)); color: var(--u-fg) }
+        .foot .save { background: var(--u-accent); color: var(--u-bg); border-color: transparent }
         .note { opacity: .65; font-size: 11px }
-        .err { color: ${varValue("red") || "#f66"}; font-size: 11px; margin-top: 6px }
+        .err { color: var(--u-err); font-size: 11px; margin-top: 6px }
       </style>
       <div class="panel">
-        <div><b>Remap</b> <span class="note">${el.tagName.toLowerCase()} · ${cs.color} on ${cs.backgroundColor}</span></div>
+        <div><b>Remap</b> <span class="note target"></span></div>
         <input class="sel" title="CSS selector (editable)" value="">
         <div class="note count"></div>
         <div class="row" id="prop">
@@ -238,12 +270,18 @@
           <button data-s="all" class="on">All similar</button>
           <button data-s="one">Only this one</button>
         </div>
-        ${swatches.length ? '<div class="grid"></div>' : '<div class="err">No Omarchy palette on this page — is the native host connected?</div>'}
+        <div class="grid" hidden></div>
+        <div class="err nopalette" hidden>No Omarchy palette on this page — is the native host connected?</div>
         <div class="foot"><button class="cancel">Cancel</button><button class="save" disabled>Save</button></div>
         <div class="err" hidden></div>
       </div>`
 
     const q = s => shadow.querySelector(s)
+
+    q(".target").textContent =
+      `${el.tagName.toLowerCase()} · ${cs.color} on ${cs.backgroundColor}`.slice(0, 120)
+    q(".grid").hidden = !swatches.length
+    q(".nopalette").hidden = !!swatches.length
 
     // Counts through open shadow roots, so "All similar" shows its true blast
     // radius before saving.
@@ -293,7 +331,7 @@
       selInput.value = st.selector; preview(); updateCount()
     })
 
-    const grid = q(".grid")
+    const grid = swatches.length ? q(".grid") : null
     if (grid) {
       for (const s of swatches) {
         const d = document.createElement("div")
@@ -321,11 +359,13 @@
       // Append into the file that already claims this URL, falling back to a
       // hostname-named one only when nothing does — a picked rule must not
       // fork a second stylesheet beside the site's real theme.
+      // Only the target stylesheet and the rule travel. The scope of a
+      // stylesheet that does not exist yet is the host's to derive from the
+      // hostname — a message does not get to say which sites a new file claims.
       const owner = await resolveOwner()
       const site = owner?.name || location.hostname
-      const matches = owner?.matches || [`*://${location.hostname}/*`]
       const resp = await chrome.runtime.sendMessage({
-        toHost: { type: "append", site, matches, css: ruleCss() },
+        toHost: { type: "append", site, css: ruleCss() },
       }).catch(e => ({ ok: false, error: String(e) }))
       if (resp && resp.ok) {
         closePanel() // preview clears when the styles push lands
@@ -346,11 +386,16 @@
   // Compact digest of the rendered page for the generation agent: visible
   // elements clustered by (tag, color, background), with counts and one
   // durable-ish sample selector per cluster.
+  // Everything in here is page-authored text on its way to a file an agent
+  // reads, so every field is bounded: no page gets to hand the agent a
+  // megabyte of prose by way of its <title>.
+  const CENSUS = { title: 200, selector: 200, clusters: 120, scan: 8000 }
+
   const buildCensus = () => {
     const clusters = new Map()
     let scanned = 0
     for (const el of document.querySelectorAll("body *")) {
-      if (++scanned > 8000) break
+      if (++scanned > CENSUS.scan) break
       const r = el.getBoundingClientRect()
       if (r.width < 6 || r.height < 6) continue
       const cs = getComputedStyle(el)
@@ -359,19 +404,19 @@
       const key = `${el.tagName}|${cs.color}|${cs.backgroundColor}|${hasText}`
       let c = clusters.get(key)
       if (!c) {
-        c = { tag: el.tagName.toLowerCase(), color: cs.color, background: cs.backgroundColor,
-              text: hasText, count: 0, sample: selectorFor(el, true) }
+        c = { tag: el.tagName.toLowerCase().slice(0, 40), color: cs.color, background: cs.backgroundColor,
+              text: hasText, count: 0, sample: selectorFor(el, true).slice(0, CENSUS.selector) }
         clusters.set(key, c)
       }
       c.count++
       if (cs.backgroundImage !== "none") c.icons = true
     }
     return {
-      url: location.href,
-      title: document.title,
+      url: location.href.slice(0, 2048),
+      title: (document.title || "").slice(0, CENSUS.title),
       omarchyMode: document.documentElement.dataset.omarchyMode || null,
       bodyBackground: document.body ? getComputedStyle(document.body).backgroundColor : null,
-      clusters: [...clusters.values()].sort((a, b) => b.count - a.count).slice(0, 120),
+      clusters: [...clusters.values()].sort((a, b) => b.count - a.count).slice(0, CENSUS.clusters),
     }
   }
 
