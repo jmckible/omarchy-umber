@@ -28,9 +28,9 @@ The user's daily browser is **Helium** (extension loaded via `--load-extension` 
 ## Gmail specifics (`sites/gmail.css`)
 
 - Assumes Gmail's internal theme is **Dark** (the user's setting). The light-mode sprite inversions invert Gmail's white icon sprites; with Gmail internally light they'd invert the wrong way.
-- Selector durability: Gmail's short classnames (`.zA` rows, `.aeN` nav, `.TK`/`.TO` labels, `.T-I` buttons, `.J-M` menus) have been stable for ~a decade. The `gb_*` classes rotate — use the stable IDs `#gb` (top bar) and `#aso_search_form_anchor` (search form) instead. Randomized classes show as `[BLOCKED: JWT token]` in probe output — never target them. The picker's `stableClass` heuristic encodes the same rule.
+- Selector durability: Gmail's short classnames (`.zA` rows, `.aeN` nav, `.TK`/`.TO` labels, `.T-I` buttons, `.J-M` menus) have been stable for ~a decade. The `gb_*` classes rotate — use the stable IDs `#gb` (top bar) and `#aso_search_form_anchor` (search form), plus the `[data-ogsr-up]` OneGoogle hook on the account chip, instead. Randomized classes show as `[BLOCKED: JWT token]` in probe output — never target them. The picker's `stableClass` heuristic encodes the same rule.
 - Traps found empirically: nav text is an `<a>` inside `.nU` carrying Gmail's own color (needs `color: inherit`); the "No new mail!" banner (`tr.TD`) hardcodes `rgba(51,51,51,.8)` in both Gmail themes; search chips live under `.S0 .HW`, not `.aqn`; the conversation surface stays light even in Gmail dark, so text and backgrounds must be forced together.
-- Untouched by design: HTML email bodies (`.a3s` descendants keep authored colors). Known gaps: Chat, the compose popup, footer links, the white wordmark image.
+- Untouched by design: HTML email bodies (`.a3s` descendants keep authored colors). Known gaps: Chat, the compose popup, footer links.
 
 ## Related
 

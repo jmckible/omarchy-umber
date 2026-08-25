@@ -25,6 +25,19 @@ body,
   fill: color-mix(in srgb, var(--omarchy-foreground) 75%, var(--omarchy-background)) !important;
 }
 
+/* Account chip's Google wordmark: the image is dark monochrome ink and Google
+   backs it with an opaque white plate so it survives any header color. Drop the
+   plate and invert the ink on dark palettes instead. Every class in that chip is
+   a volatile gb_*, so anchor on #gb plus the OneGoogle data hook; :first-child
+   is the wordmark plate, the avatar is the sibling after it and stays untouched. */
+#gb [data-ogsr-up] [role="button"] > div:first-child {
+  background-color: transparent !important;
+}
+
+:root[data-omarchy-mode="dark"] #gb [data-ogsr-up] [role="button"] > div:first-child img {
+  filter: invert(1);
+}
+
 #aso_search_form_anchor,
 #aso_search_form_anchor td {
   background-color: var(--omarchy-lighter-background) !important;
