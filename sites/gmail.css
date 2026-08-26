@@ -246,6 +246,16 @@ body,
   color: var(--omarchy-accent) !important;
 }
 
+/* Settings address chips ("Send mail as", forwarding, delegates): .aiL is the
+   chip field, and the address inside keeps Gmail's own rgb(32,33,36) ink over
+   the themed surface -- measured 1.34 against it, i.e. invisible. The depth is
+   deliberately not pinned: `.aiL > div > div > div` reads like the right chain
+   but bottoms out on a span, so it matches nothing at all (0 hits on inbox,
+   search and settings, verified 2026-08-25). */
+.aiL :is(div, span) {
+  color: var(--omarchy-foreground) !important;
+}
+
 /* Gmail's internal Dark theme (the assumed setting) ships white icon sprites,
    invisible on light Omarchy palettes — invert them when the Omarchy mode
    (attribute set by content.js) is light. The starred (gold) star is excluded.
