@@ -87,9 +87,10 @@ LOCKFILE="$RUNDIR/send.lock"
 : >"$LOCKFILE"
 
 mkdir -p "$SITES_DIR"
-# The root every stylesheet read is checked against, resolved once: read_bounded
-# compares it with the descriptor's real path, so a symlinked $HOME has to be
-# resolved here or every read would be refused.
+# The root every stylesheet read is checked against and the path the watcher
+# watches, resolved once: read_bounded compares it with the descriptor's real
+# path, so a symlinked $HOME has to be resolved here or every read would be
+# refused, and inotifywait needs a real directory to emit matchable events.
 SITES_ROOT=$(cd -- "$SITES_DIR" && pwd -P) || exit 1
 
 cleanup() {
@@ -467,16 +468,26 @@ send_styles
 
 # theme.name is written after the atomic theme-dir swap, so it marks a completed
 # theme change; the sleep lets the slower per-app retints land before we resend.
+#
+# The sites watch is on $SITES_ROOT, not $SITES_DIR. inotifywait renders %w as
+# the path it was handed, appending a trailing slash only when that path is a
+# real directory -- hand it a symlink to one and every event arrives as
+# "<dir>" + "<file>" with no separator, so "$SITES_DIR/"*.css never matches and
+# a save silently stops reaching the browser. Reads already run against the
+# resolved root, so watching it too keeps a symlinked sites directory (a
+# stylesheet dir kept in a dotfiles repo) a working setup rather than one that
+# loads once and then goes quiet. Per-file symlinks stay refused regardless:
+# that is read_bounded's O_NOFOLLOW, which this does not touch.
 (
   inotifywait -mq -e close_write,moved_to,create,delete --format '%w%f' \
-    "$STATE_DIR" "$SITES_DIR" |
+    "$STATE_DIR" "$SITES_ROOT" |
     while read -r changed; do
       case $changed in
         "$STATE_DIR/theme.name")
           sleep 0.2
           send_palette
           ;;
-        "$SITES_DIR/"*.css)
+        "$SITES_ROOT/"*.css)
           sleep 0.2
           send_styles
           ;;

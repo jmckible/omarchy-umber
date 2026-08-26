@@ -93,6 +93,44 @@ else
 fi
 teardown
 
+# --- the sites directory itself ----------------------------------------------
+# Keeping stylesheets in a dotfiles repo makes sites/ a symlink to a directory.
+# That is a supported setup: reads resolve through it and the watcher watches
+# the resolved root. Neither may soften the per-file rule, and the live push has
+# to keep working -- a sites dir that loads once and then goes quiet is the
+# failure that looks like success.
+
+setup
+rmdir "$SITES"
+mkdir -p "$SANDBOX/dotfiles/sites"
+ln -s "$SANDBOX/dotfiles/sites" "$SITES"
+printf 'SECRET KEY MATERIAL\n' >"$SANDBOX/secret"
+ln -s "$SANDBOX/secret" "$SANDBOX/dotfiles/sites/leak.css"
+out=$(run 0.4)
+if grep -q 'SECRET KEY MATERIAL' <<<"$out"; then
+  no "symlinked sites dir: a planted symlink inside it was followed"
+else
+  ok "a symlinked sites dir does not soften the per-file symlink refusal"
+fi
+teardown
+
+setup
+rmdir "$SITES"
+mkdir -p "$SANDBOX/dotfiles/sites"
+ln -s "$SANDBOX/dotfiles/sites" "$SITES"
+(run 2.0 >"$SANDBOX/live.out" 2>/dev/null) &
+drv=$!
+sleep 1.2
+printf '/* @match example.com */\nbody{--umber-live-reload:1}\n' \
+  >"$SANDBOX/dotfiles/sites/live.css"
+wait "$drv"
+if grep -q 'umber-live-reload' "$SANDBOX/live.out"; then
+  ok "a save through a symlinked sites dir is pushed to the browser"
+else
+  no "a save through a symlinked sites dir never reached the browser"
+fi
+teardown
+
 # --- writes: append ----------------------------------------------------------
 
 setup
