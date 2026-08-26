@@ -2,7 +2,7 @@
 
 Your Omarchy theme, in your browser.
 
-[![Umber: live Omarchy theme sync for Chromium-family browsers](https://img.youtube.com/vi/QFHmhyZwx5o/maxresdefault.jpg)](https://www.youtube.com/watch?v=QFHmhyZwx5o)
+[![Watch the Umber demo: live Omarchy theme sync for Chromium-family browsers](docs/hero.jpg)](https://www.youtube.com/watch?v=QFHmhyZwx5o)
 
 Umber stamps the full Omarchy palette onto every page as `--omarchy-*` CSS custom properties and keeps them live — change the desktop theme and every themed site retints in place, no reload. Per-site stylesheets consume those variables, and the whole collection is plain CSS files in `~/.config/umber/sites/`: readable, editable while you watch, and shareable one file at a time.
 
