@@ -16,7 +16,7 @@ const init = async () => {
   const themable = /^https?:/.test(url)
   const site = themable ? new URL(url).hostname : null
 
-  const v = await chrome.storage.local.get(["omarchyColors", "omarchyStyles", "omarchyEnabled", "omarchyConnected", "omarchyGenerate"])
+  const v = await chrome.storage.local.get(["omarchyColors", "omarchyStyles", "omarchyDisabledSites", "omarchyConnected", "omarchyGenerate"])
 
   // The stylesheet already covering this URL, if any — the file the agent
   // should refine instead of forking a hostname-named second one. Kept fresh
@@ -32,25 +32,49 @@ const init = async () => {
   }
   paint(v.omarchyColors)
 
-  $("enabled").checked = v.omarchyEnabled !== false
-  $("enabled").addEventListener("change", e =>
-    chrome.storage.local.set({ omarchyEnabled: e.target.checked }))
+  // The power button is scoped to this tab's host. Stored as a blocklist so on
+  // is the default for every site that has never been touched, and so the key
+  // stays absent until the user turns something off.
+  let off = v.omarchyDisabledSites || []
+  // Everything keyed to "which sheet owns this URL, and is the host blocked" —
+  // repainted together because owner drives all three. On is a conjunction:
+  // some stylesheet claims this URL *and* the host is not switched off. With
+  // nothing claiming it there is no switch to offer — flipping one would change
+  // nothing on the page — so the button goes inert and the agent is the way
+  // forward. Off and unthemed therefore look alike, which is honest: neither is
+  // putting anything on the page.
+  const renderSite = () => {
+    const themed = themable && !!owner
+    const on = themed && !off.includes(site)
+    $("power").setAttribute("aria-pressed", String(on))
+    $("power").disabled = !themed
+    $("power").title = themed ? `Turn Umber ${on ? "off" : "on"} for ${site}` : ""
+    $("sheet").textContent = owner?.name || ""
+    // Same create-vs-refine split the host reads off `owner`, said out loud —
+    // the verb changes, "with agent" stays put as the tell that a terminal
+    // opens. Never touches .disabled: that is the generate lifecycle's to own.
+    $("generate").textContent = owner ? "Refine with agent" : "Theme with agent"
+    $("generate").title = !themable ? ""
+      : owner ? `Refine ${owner.name} with the agent`
+      : `Write a new stylesheet for ${site} with the agent`
+  }
+  // A disabled button cannot dispatch click, but site is null off http(s) and a
+  // null must never reach the blocklist.
+  $("power").addEventListener("click", () => {
+    if (!themable || !owner) return
+    off = off.includes(site) ? off.filter(h => h !== site) : [...off, site]
+    chrome.storage.local.set({ omarchyDisabledSites: off })
+    renderSite()
+  })
 
   const renderHost = ok => {
     $("host-status").textContent = ok ? "host: connected" : "host: disconnected"
+    $("host-status").classList.toggle("down", !ok)
   }
   renderHost(v.omarchyConnected)
 
   $("site").textContent = site || "(not a themable page)"
-  const renderStyles = styles => {
-    $("styles").replaceChildren(...(styles || []).map(s => {
-      const li = document.createElement("li")
-      li.textContent = s.name
-      if (themable && Umber.matchesUrl(s.matches, url)) li.classList.add("on")
-      return li
-    }))
-  }
-  renderStyles(v.omarchyStyles)
+  renderSite()
   renderGenerate(v.omarchyGenerate)
 
   $("pick").disabled = $("generate").disabled = !themable
@@ -82,10 +106,11 @@ const init = async () => {
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== "local") return
     if (changes.omarchyColors) paint(changes.omarchyColors.newValue)
+    if (changes.omarchyDisabledSites) { off = changes.omarchyDisabledSites.newValue || []; renderSite() }
     if (changes.omarchyConnected) renderHost(changes.omarchyConnected.newValue)
     if (changes.omarchyStyles) {
       owner = Umber.resolveStyle(changes.omarchyStyles.newValue, url)
-      renderStyles(changes.omarchyStyles.newValue)
+      renderSite()
     }
     if (changes.omarchyGenerate) {
       renderGenerate(changes.omarchyGenerate.newValue)

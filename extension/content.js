@@ -8,6 +8,25 @@ const state = { colors: null, styles: [], enabled: true }
 const sheets = new Map() // style name → CSSStyleSheet
 const ownSheets = new Set()
 
+// Umber is on everywhere by default; the popup writes a blocklist of hostnames
+// (omarchyDisabledSites) and this frame is off when any host in its embedding
+// chain is on that list. Own host alone isn't enough: turning a site off should
+// not leave its iframes tinted, and an about:blank frame has no host to consult.
+// ancestorOrigins is Chromium-only and populated across origins; sandboxed
+// frames report the string "null", which the URL parse rejects.
+const frameHosts = () => {
+  const hosts = new Set()
+  if (location.hostname) hosts.add(location.hostname)
+  for (const origin of location.ancestorOrigins || [])
+    try { hosts.add(new URL(origin).hostname) } catch {}
+  return hosts
+}
+
+// Fixed for this document: a same-document navigation cannot change a hostname,
+// and anything else reloads the content script.
+const hosts = frameHosts()
+const offHere = list => (list || []).some(host => hosts.has(host))
+
 // Match-pattern logic lives in match.js (Umber.matchesUrl), shared with the
 // popup and the picker so all three agree on which stylesheet owns a URL.
 
@@ -111,10 +130,10 @@ else scanForShadows(document.documentElement)
 
 const sync = () => { setPalette(); syncSheets() }
 
-chrome.storage.local.get(["omarchyColors", "omarchyStyles", "omarchyEnabled"]).then(v => {
+chrome.storage.local.get(["omarchyColors", "omarchyStyles", "omarchyDisabledSites"]).then(v => {
   state.colors = v.omarchyColors || null
   state.styles = v.omarchyStyles || []
-  state.enabled = v.omarchyEnabled !== false
+  state.enabled = !offHere(v.omarchyDisabledSites)
   sync()
 })
 
@@ -123,7 +142,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
   let dirty = false
   if (changes.omarchyColors) { state.colors = changes.omarchyColors.newValue || null; dirty = true }
   if (changes.omarchyStyles) { state.styles = changes.omarchyStyles.newValue || []; dirty = true }
-  if (changes.omarchyEnabled) { state.enabled = changes.omarchyEnabled.newValue !== false; dirty = true }
+  if (changes.omarchyDisabledSites) { state.enabled = !offHere(changes.omarchyDisabledSites.newValue); dirty = true }
   if (dirty) sync()
 })
 
