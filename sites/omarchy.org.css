@@ -1,0 +1,164 @@
+/* @match omarchy.org */
+
+/* omarchy.org keeps its whole Tokyo Night scheme in assets/css/root.css: ten
+   --rgb-* triplets, with the --color-* tokens every rule consumes derived as
+   rgb(var(--rgb-*)). Remapping the --color-* layer is most of the theme. The
+   triplets themselves cannot be remapped: --omarchy-* values are hex, and the
+   legacy comma form rgba(var(--rgb-x), a) used throughout the page bundles
+   rejects relative color syntax (verified in Chromium: rgb(from #hex r g b /
+   a) parses, rgba(from #hex r g b, a) does not — the declaration would just
+   drop). So every rule consuming a raw triplet with alpha is restated per
+   selector below. rgba(var(--rgb-black), …) shadows are left alone: black
+   shadows read correctly in both modes.
+
+   The mapping is exact where the palette allows — confirmed against the
+   tokyo-night desktop theme, where the site's values coincide key for key:
+   background-night = background, background-storm = lighter_background,
+   terminal-blue = accent, terminal-black = muted, terminal-white =
+   bright_foreground, green = green. terminal-cyan (#7dcfff, links) has no
+   palette twin; bright_cyan is its semantic slot. turquoise (#b4f9f8, the
+   hover pop on buttons, links and card outlines) is a pale tint with no twin
+   either — mixed from bright_cyan toward bright_foreground, so it lands pale
+   in dark themes and deep in light ones.
+
+   Left alone by design: the hero logo PNG, video thumbnails and workstation
+   photos (authored artwork); the laseretch <canvas> that replays the ASCII
+   mark (its green is baked into the wasm effect — the <pre> fallback behind
+   it is themed); and the meetups page's cross-origin calendar embed. */
+
+:root, :host {
+  --color-background-night: var(--omarchy-background) !important;
+  --color-background-storm: var(--omarchy-lighter-background) !important;
+  --color-terminal-blue: var(--omarchy-accent) !important;
+  --color-terminal-cyan: var(--omarchy-bright-cyan) !important;
+  --color-terminal-black: var(--omarchy-muted) !important;
+  --color-terminal-white: var(--omarchy-bright-foreground) !important;
+  --color-white: var(--omarchy-bright-foreground) !important;
+  --color-green: var(--omarchy-green) !important;
+  --color-turquoise: color-mix(in srgb, var(--omarchy-bright-cyan) 40%, var(--omarchy-bright-foreground)) !important;
+  --border-color: color-mix(in srgb, var(--omarchy-muted) 80%, transparent) !important;
+}
+
+/* The site declares color-scheme: light dark; pin form controls and
+   scrollbars to the desktop's side. */
+:root[data-omarchy-mode="dark"] {
+  color-scheme: dark !important;
+}
+
+:root[data-omarchy-mode="light"] {
+  color-scheme: light !important;
+}
+
+::selection {
+  background: var(--omarchy-selection-background);
+  color: var(--omarchy-selection-foreground);
+}
+
+/* news.css re-declares its border token on .news-body, not :root — an
+   inherited :root override never reaches that subtree. */
+.news-body {
+  --news-border-color: color-mix(in srgb, var(--omarchy-muted) 80%, transparent) !important;
+}
+
+/* Raw-triplet consumers, restated. No !important from here down: this sheet
+   sorts after the site's, so identical selectors win by order, and state
+   rules that should still win (.search__input:focus goes green) keep their
+   higher specificity. */
+
+/* rgba(var(--rgb-terminal-white), 0.6) — and footer.css's slash form */
+.footer__section p,
+.search__empty,
+.team__note,
+.member__meta,
+.resident__meta,
+.security__warning,
+.air__note,
+.sponsorship__terms,
+.rules__note,
+.brand__hint {
+  color: color-mix(in srgb, var(--omarchy-bright-foreground) 60%, transparent);
+}
+
+/* rgba(var(--rgb-terminal-white), 0.5) — list markers */
+.security__section li::before,
+.air__perks li::before {
+  color: color-mix(in srgb, var(--omarchy-bright-foreground) 50%, transparent);
+}
+
+/* rgba(var(--rgb-terminal-white), 0.35) */
+.search__input::placeholder,
+.patrons__aside,
+.teams__aside,
+.rule::before {
+  color: color-mix(in srgb, var(--omarchy-bright-foreground) 35%, transparent);
+}
+
+/* rgba(var(--rgb-terminal-white), 0.3) */
+.search__shortcut {
+  color: color-mix(in srgb, var(--omarchy-bright-foreground) 30%, transparent);
+}
+
+/* rgba(var(--rgb-terminal-black), 0.8) borders. border-color rather than the
+   original per-side properties: each of these rules draws only one visible
+   edge, so recoloring all four is safe. */
+.search__input,
+.search__results,
+.manual__content td,
+.manual__pagination,
+.team + .team,
+.security__section,
+.air__section + .air__section,
+.sponsorship + .sponsorship,
+.meetups__embed,
+.rules,
+.rules__note,
+.brand__section + .brand__section,
+.brand__figure {
+  border-color: color-mix(in srgb, var(--omarchy-muted) 80%, transparent);
+}
+
+/* rgba(var(--rgb-terminal-black), 0.8) avatar rings drawn as box-shadow */
+.member__avatar,
+.resident__avatar {
+  box-shadow: 0 0 0 var(--border-width) color-mix(in srgb, var(--omarchy-muted) 80%, transparent);
+}
+
+.search__result {
+  border-top-color: color-mix(in srgb, var(--omarchy-muted) 50%, transparent);
+}
+
+.search__result--active,
+.search__result:hover {
+  background: color-mix(in srgb, var(--omarchy-muted) 45%, transparent);
+}
+
+.manual__content code {
+  background: color-mix(in srgb, var(--omarchy-muted) 50%, transparent);
+}
+
+/* Workstation photo caption chip: rgba(var(--rgb-white), 0.9) with
+   terminal-black text. Self-paired so it stays a foreground-colored chip with
+   background-colored text in both modes. */
+.workstations__image figure figcaption {
+  background: color-mix(in srgb, var(--omarchy-bright-foreground) 90%, transparent);
+  color: var(--omarchy-background);
+}
+
+/* Lightbox backdrop: rgba(var(--rgb-background-night), 0.9) over blur */
+.workstations__backdrop {
+  background: color-mix(in srgb, var(--omarchy-background) 90%, transparent);
+}
+
+/* The laseretch canvas masthead composites with mix-blend-mode: screen —
+   near-invisible over a light ground. In light mode drop to the site's own
+   static fallback (the themed <pre>), exactly as its reduced-motion path
+   does. !important here because the site hides the pre with its own
+   .wte-home rules while a canvas is live. */
+:root[data-omarchy-mode="light"] .pre__wte {
+  display: none !important;
+}
+
+:root[data-omarchy-mode="light"].wte-home .pre pre {
+  animation: none !important;
+  visibility: visible !important;
+}
