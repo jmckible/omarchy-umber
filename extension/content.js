@@ -34,11 +34,18 @@ const offHere = list => (list || []).some(host => hosts.has(host))
 // property on every page, so the shape is re-checked where it is used.
 const PALETTE_KEY = /^[a-z0-9_]{1,40}$/
 
+// One property name from the last stamp, kept as the cheap witness that the
+// inline block is still there (see the re-stamp observer below).
+let paletteMark = null
+
 const setPalette = () => {
+  paletteMark = null
   if (state.enabled && state.colors) {
     for (const [key, value] of Object.entries(state.colors)) {
       if (!PALETTE_KEY.test(key) || typeof value !== "string" || value.length > 64) continue
-      root.style.setProperty(`--omarchy-${key.replaceAll("_", "-")}`, value)
+      const prop = `--omarchy-${key.replaceAll("_", "-")}`
+      root.style.setProperty(prop, value)
+      paletteMark ??= prop
     }
     root.dataset.omarchyMode = state.colors.mode || "dark"
   } else {
@@ -46,6 +53,27 @@ const setPalette = () => {
     delete root.dataset.omarchyMode
   }
 }
+
+// A soft navigation that swaps the document element's attributes takes the
+// palette with it: Astro view transitions (omarchy.org) copy the incoming
+// document's attributes onto <html>, and Turbo and htmx boosting do the same,
+// dropping data-omarchy-mode and the whole inline --omarchy-* block in one go.
+// Nothing reloads the content script and the adopted sheets survive, so what is
+// left is site CSS whose every var() resolves to nothing — worse than not being
+// installed, because a token override with !important still beats the site's own
+// value while resolving to garbage. The element itself is not replaced (Astro
+// mutates attributes in place), so watching it is enough.
+//
+// The observer sees setPalette's own writes too, so it must act only on a real
+// absence or it would re-enter forever.
+const paletteIntact = () => {
+  if (!(state.enabled && state.colors)) return true
+  if (root.dataset.omarchyMode !== (state.colors.mode || "dark")) return false
+  return paletteMark === null || root.style.getPropertyValue(paletteMark) !== ""
+}
+
+new MutationObserver(() => { if (!paletteIntact()) setPalette() })
+  .observe(root, { attributes: true, attributeFilter: ["style", "data-omarchy-mode"] })
 
 // Site CSS reaches shadow DOM too: the same constructed sheets are adopted
 // into every open shadow root (imperative roots announced by shadow-hook.js,
