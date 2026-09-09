@@ -36,46 +36,47 @@ Then restart the browser.
 … 56 in all, plus data-omarchy-mode="dark"
 ```
 
-**3. Open Gmail.** `sites/gmail.css` ships with Umber and is seeded on install, so `mail.google.com` is themed the moment the extension loads. This is the worked example — read it to see what a finished site style looks like.
+**3. Open [Omarchy Radio](https://radio.omarchy.org).** `sites/radio.omarchy.org.css` ships with Umber and is seeded on install, so the site is themed the moment the extension loads. This is the worked example — read it to see what a finished site style looks like.
 
 **4. Change your desktop theme.** Every open themed tab retints as the theme lands. Nothing reloads, and nothing is stored per-theme: the stylesheets only ever reference variables, so one file covers every palette you'll ever install.
 
-> Gmail's own Appearance setting should be **Dark**. The starter inverts Gmail's white icon sprites on light Omarchy palettes; with Gmail internally set to light, those inversions run the wrong way.
+> `sites/gmail.css` ships as well, and assumes Gmail's own Appearance setting is **Dark**. It inverts Gmail's white icon sprites on light Omarchy palettes; with Gmail internally set to light, those inversions run the wrong way.
 
 ## Site styles
 
 One CSS file per site in `~/.config/umber/sites/`, scoped by a comment header:
 
 ```css
-/* @match https://mail.google.com/* */
+/* @match radio.omarchy.org */
 
-/* Thread list */
-.zA.yO {                                    /* read row    */
-  background-color: var(--omarchy-background) !important;
+:root, :host {
+  --bg:   var(--omarchy-background) !important;         /* the deck       */
+  --lcd:  var(--omarchy-darker-background) !important;  /* inset screen   */
+  --fg:   var(--omarchy-bright-foreground) !important;  /* ink            */
+  --ac:   var(--omarchy-accent) !important;             /* accent fills   */
+  --acFg: var(--omarchy-background) !important;         /* ink on accent  */
 }
 
-.zA.zE {                                    /* unread row  */
-  background-color: var(--omarchy-lighter-background) !important;
-}
-
-/* Compose button */
-.T-I.T-I-KE.L3 {
-  background-color: var(--omarchy-accent) !important;
-  color: var(--omarchy-background) !important;
+::selection {
+  background: var(--omarchy-selection);
+  color: var(--omarchy-selection-foreground);
 }
 ```
 
-`@match` takes comma-separated Chromium match patterns, and a bare `mail.google.com` is shorthand for `*://mail.google.com/*` — so a style's scope can be a whole domain, one page, or any wildcard in between. The filename is just a name; the header decides what the file claims.
+`@match` takes comma-separated Chromium match patterns, and a bare `radio.omarchy.org` is shorthand for `*://radio.omarchy.org/*` — so a style's scope can be a whole domain, one page, or any wildcard in between. The filename is just a name; the header decides what the file claims.
 
 Edit a file and open tabs restyle immediately — the host watches the directory, so a save is the whole feedback loop. That makes the directory the place to iterate, and sharing a site style is just sharing a file.
 
-Two things the Gmail starter demonstrates that are worth copying. Mode-specific rules scope off an attribute Umber sets for you:
+Three things the Radio starter demonstrates that are worth copying. Where a site already keeps its colors in custom properties, re-declaring that block from the palette is most of the job — the site's own stylesheet then does the rest unchanged, and an `!important` author declaration outranks the site's inline style whatever order the two land in. That is the whole of the block above.
+
+Mode-specific rules scope off an attribute Umber sets for you. Radio's LCD is lit-on-dark under a dark theme and dark-on-light under a light one, so "recessed" is two different mixes rather than one:
 
 ```css
-:root[data-omarchy-mode="light"] .bqX { filter: invert(1); }
+:root[data-omarchy-mode="dark"]  { --g1: color-mix(in srgb, var(--omarchy-accent) 62%, var(--omarchy-darker-background)) !important; }
+:root[data-omarchy-mode="light"] { --g1: color-mix(in srgb, var(--omarchy-accent) 72%, var(--omarchy-foreground)) !important; }
 ```
 
-And durable selectors matter more than clever ones. Gmail's short classnames (`.zA`, `.aeN`, `.T-I`) have been stable for a decade; its `gb_*` classes rotate weekly, so the starter uses the stable `#gb` id instead. Anything long, digit-heavy or hash-like is generated — don't target it.
+And where a site has no tokens to borrow, you're writing selectors instead — where durable ones matter more than clever ones. `gmail.css` targets Gmail's short classnames (`.zA`, `.aeN`, `.T-I`), stable for a decade, and the `#gb` id rather than the `gb_*` classes that rotate weekly. Anything long, digit-heavy or hash-like is generated — don't target it.
 
 ## Theming a site nothing covers yet
 
