@@ -1,164 +1,131 @@
 /* @match omarchy.org */
 
-/* omarchy.org keeps its whole Tokyo Night scheme in assets/css/root.css: ten
-   --rgb-* triplets, with the --color-* tokens every rule consumes derived as
-   rgb(var(--rgb-*)). Remapping the --color-* layer is most of the theme. The
-   triplets themselves cannot be remapped: --omarchy-* values are hex, and the
-   legacy comma form rgba(var(--rgb-x), a) used throughout the page bundles
-   rejects relative color syntax (verified in Chromium: rgb(from #hex r g b /
-   a) parses, rgba(from #hex r g b, a) does not — the declaration would just
-   drop). So every rule consuming a raw triplet with alpha is restated per
-   selector below. rgba(var(--rgb-black), …) shadows are left alone: black
-   shadows read correctly in both modes.
+/* The 2026-09 redesign (Astro + Tailwind v4) replaced the old --rgb-* and
+   --color-* scheme wholesale: nothing the previous version of this file
+   targeted survives. The site now carries 22 built-in themes as blocks of 29 tokens keyed
+   [data-theme=<name>] on <html>, and those 22 names are exactly Omarchy's 22
+   built-in themes — the site generated them from the same palettes we get. So
+   this is a reconstruction of the site's own generator, not an approximation.
 
-   The mapping is exact where the palette allows — confirmed against the
-   tokyo-night desktop theme, where the site's values coincide key for key:
-   background-night = background, background-storm = lighter_background,
-   terminal-blue = accent, terminal-black = muted, terminal-white =
-   bright_foreground, green = green. terminal-cyan (#7dcfff, links) has no
-   palette twin; bright_cyan is its semantic slot. turquoise (#b4f9f8, the
-   hover pop on buttons, links and card outlines) is a pale tint with no twin
-   either — mixed from bright_cyan toward bright_foreground, so it lands pale
-   in dark themes and deep in light ones.
+   Derived by fitting each --t-* token against every theme's own
+   `omarchy-theme-color --file <theme>/colors.toml --all` output, 22 samples per
+   token. Exact in 22/22: bg-deep=dark_background, bg=background,
+   selection=selection_background, field-bg=darker_background. Near-exact:
+   brand/field-lit=accent (21/22), border-strong=muted (21/22),
+   text=bright_foreground, text-secondary=foreground,
+   surface-2/border-subtle=lighter_background. The rest are mixes whose ratios
+   the fit recovered cleanly (avg error under 8/255 across all 22 themes).
 
-   Left alone by design: the hero logo PNG, video thumbnails and workstation
-   photos (authored artwork); the laseretch <canvas> that replays the ASCII
-   mark (its green is baked into the wasm effect — the <pre> fallback behind
-   it is themed); and the meetups page's cross-origin calendar embed. */
+   The wordmark ramp is the one place the site branches on mode: it mixes brand
+   30%/62% toward pure white in its 17 dark themes and 22%/45% toward pure black
+   in its 5 light ones — i.e. always toward the ink. bright_foreground *is* the
+   ink in either polarity, so one unmodal declaration covers both and keeps the
+   accent's hue (mixing toward `foreground` fits marginally better on paper but
+   desaturates the crest to grey, losing the point of the gradient).
 
-:root, :host {
-  --color-background-night: var(--omarchy-background) !important;
-  --color-background-storm: var(--omarchy-lighter-background) !important;
-  --color-terminal-blue: var(--omarchy-accent) !important;
-  --color-terminal-cyan: var(--omarchy-bright-cyan) !important;
-  --color-terminal-black: var(--omarchy-muted) !important;
-  --color-terminal-white: var(--omarchy-bright-foreground) !important;
-  --color-white: var(--omarchy-bright-foreground) !important;
-  --color-green: var(--omarchy-green) !important;
-  --color-turquoise: color-mix(in srgb, var(--omarchy-bright-cyan) 40%, var(--omarchy-bright-foreground)) !important;
-  --border-color: color-mix(in srgb, var(--omarchy-muted) 80%, transparent) !important;
+   Which theme the site starts in is random: a boot script picks from the light
+   or dark pool by prefers-color-scheme unless localStorage.omarchy-site-theme is
+   already set. That randomness is why every one of the 29 tokens is overridden
+   here rather than just the palette-ish ones — a light site theme under a dark
+   desktop would otherwise leak its own polarity through the neutral overlays.
+   It also means the header's "Change website theme" button goes visually inert
+   while this sheet is on; the desktop theme is the source of truth now.
+
+   Left alone by design: --t-partner-* (sponsor brand colors), the laseretch
+   canvas and hero logo, workstation photos and video thumbnails. Untouched
+   because nothing renders them — .syntax-*, .prominent-callout (hardcoded Tokyo
+   Night oklch) and --t-brand-soft are dead CSS on all 37 pages. */
+
+/* Gated on [data-omarchy-mode] because the site navigates with Astro view
+   transitions, and a swap copies the incoming document's attributes onto <html>
+   — dropping both the mode attribute and the 56 inline --omarchy-* properties
+   content.js had set. Ungated, every var() below would then resolve to nothing
+   while the !important still beat the site's own [data-theme] block, leaving a
+   page with no background at all. content.js sets the attribute and the
+   properties together, so its presence is exactly "the palette is here"; when it
+   goes, these rules stop matching and the site's own theme takes back over until
+   the next full load re-stamps it. :host cannot be gated the same way (nothing
+   inside a shadow tree can test an attribute on <html>), which is harmless here
+   only because the site opens no shadow roots.
+
+   .dark-scope re-declares the whole token block hardcoded to Tokyo Night, so a
+   :root-only override would never reach it. It is unreferenced on all 37 pages
+   today; it is in the list so it cannot come back as a Tokyo Night island. */
+:root[data-omarchy-mode], :host, :root[data-omarchy-mode] .dark-scope {
+  /* Surfaces */
+  --t-bg-deep: var(--omarchy-dark-background) !important;
+  --t-bg: var(--omarchy-background) !important;
+  --t-surface: color-mix(in srgb, var(--omarchy-background) 50%, var(--omarchy-lighter-background)) !important;
+  --t-surface-2: var(--omarchy-lighter-background) !important;
+  --t-border-subtle: var(--omarchy-lighter-background) !important;
+  --t-border-strong: var(--omarchy-muted) !important;
+
+  /* Ink */
+  --t-text: var(--omarchy-bright-foreground) !important;
+  --t-text-secondary: var(--omarchy-foreground) !important;
+  --t-text-muted: color-mix(in srgb, var(--omarchy-dark-foreground) 50%, var(--omarchy-foreground)) !important;
+
+  /* Brand. brand-ink is the label on an accent-filled button, so it wants the
+     background pole: dark under a dark desktop, near-white under a light one. */
+  --t-brand: var(--omarchy-accent) !important;
+  --t-brand-soft: color-mix(in srgb, var(--omarchy-accent) 12%, transparent) !important;
+  --t-brand-ink: var(--omarchy-background) !important;
+
+  --t-selection: var(--omarchy-selection-background) !important;
+
+  /* The hero/footer ground and the five-stop gradient masked through the
+     wordmark SVG, bottom (dim) to top (crest). The hero's <canvas> replays the
+     mark in field-lit over field-bg and reads both once at init — it will not
+     repaint on a live palette push, so a desktop theme change leaves that one
+     element stale until the page is loaded again. */
+  --t-field-bg: var(--omarchy-darker-background) !important;
+  --t-field-dim: color-mix(in srgb, var(--omarchy-accent) 30%, var(--omarchy-darker-background)) !important;
+  --t-field-mid: color-mix(in srgb, var(--omarchy-accent) 60%, var(--omarchy-dark-background)) !important;
+  --t-field-lit: var(--omarchy-accent) !important;
+  --t-field-hover: color-mix(in srgb, var(--omarchy-accent) 60%, var(--omarchy-bright-foreground)) !important;
+  --t-field-crest: color-mix(in srgb, var(--omarchy-accent) 25%, var(--omarchy-bright-foreground)) !important;
+
+  /* Ghost nav echoed inside the hero. Only --t-hdr-text-2 of the six --t-hdr-*
+     tokens is ever read; the other five are unreferenced sitewide. */
+  --t-hdr-text-2: color-mix(in srgb, var(--omarchy-foreground) 65%, var(--omarchy-darker-background)) !important;
+
+  /* Neutral overlays. Mixing bright_foreground toward transparent tracks the
+     desktop's polarity on its own — light film over dark, dark film over light —
+     which is what the site's own #ffffff../#000000.. pairs are doing per mode. */
+  --t-img-outline: color-mix(in srgb, var(--omarchy-bright-foreground) 10%, transparent) !important;
+  --t-scroll-thumb: color-mix(in srgb, var(--omarchy-bright-foreground) 14%, transparent) !important;
+  --t-elevation: 0 0 0 1px color-mix(in srgb, var(--omarchy-bright-foreground) 7%, transparent) !important;
+  --t-elevation-hover: 0 0 0 1px color-mix(in srgb, var(--omarchy-bright-foreground) 13%, transparent) !important;
 }
 
-/* The site declares color-scheme: light dark; pin form controls and
-   scrollbars to the desktop's side. */
+/* The site pins color-scheme per theme; follow the desktop instead. */
 :root[data-omarchy-mode="dark"] {
   color-scheme: dark !important;
 }
 
+/* Light mode keeps the site's layered card shadow — a ring alone reads flat on
+   a pale ground, and a blurred bright_foreground would glow rather than sit. */
 :root[data-omarchy-mode="light"] {
   color-scheme: light !important;
 }
 
-::selection {
+:root[data-omarchy-mode="light"], :root[data-omarchy-mode="light"] .dark-scope {
+  --t-elevation:
+    0 0 0 1px color-mix(in srgb, var(--omarchy-bright-foreground) 6%, transparent),
+    0 1px 3px color-mix(in srgb, var(--omarchy-bright-foreground) 5%, transparent),
+    0 4px 10px -4px color-mix(in srgb, var(--omarchy-bright-foreground) 5%, transparent) !important;
+  --t-elevation-hover:
+    0 0 0 1px color-mix(in srgb, var(--omarchy-bright-foreground) 9%, transparent),
+    0 1px 3px color-mix(in srgb, var(--omarchy-bright-foreground) 7%, transparent),
+    0 4px 10px -4px color-mix(in srgb, var(--omarchy-bright-foreground) 8%, transparent) !important;
+}
+
+/* The site's own ::selection takes its foreground from --t-text; use the
+   palette's dedicated selection pair instead. Gated like the block above: these
+   are ordinary properties, so an unresolvable var() would compute to unset
+   rather than fall back to the site's own ::selection rule. */
+:root[data-omarchy-mode]::selection,
+:root[data-omarchy-mode] ::selection {
   background: var(--omarchy-selection-background);
   color: var(--omarchy-selection-foreground);
-}
-
-/* news.css re-declares its border token on .news-body, not :root — an
-   inherited :root override never reaches that subtree. */
-.news-body {
-  --news-border-color: color-mix(in srgb, var(--omarchy-muted) 80%, transparent) !important;
-}
-
-/* Raw-triplet consumers, restated. No !important from here down: this sheet
-   sorts after the site's, so identical selectors win by order, and state
-   rules that should still win (.search__input:focus goes green) keep their
-   higher specificity. */
-
-/* rgba(var(--rgb-terminal-white), 0.6) — and footer.css's slash form */
-.footer__section p,
-.search__empty,
-.team__note,
-.member__meta,
-.resident__meta,
-.security__warning,
-.air__note,
-.sponsorship__terms,
-.rules__note,
-.brand__hint {
-  color: color-mix(in srgb, var(--omarchy-bright-foreground) 60%, transparent);
-}
-
-/* rgba(var(--rgb-terminal-white), 0.5) — list markers */
-.security__section li::before,
-.air__perks li::before {
-  color: color-mix(in srgb, var(--omarchy-bright-foreground) 50%, transparent);
-}
-
-/* rgba(var(--rgb-terminal-white), 0.35) */
-.search__input::placeholder,
-.patrons__aside,
-.teams__aside,
-.rule::before {
-  color: color-mix(in srgb, var(--omarchy-bright-foreground) 35%, transparent);
-}
-
-/* rgba(var(--rgb-terminal-white), 0.3) */
-.search__shortcut {
-  color: color-mix(in srgb, var(--omarchy-bright-foreground) 30%, transparent);
-}
-
-/* rgba(var(--rgb-terminal-black), 0.8) borders. border-color rather than the
-   original per-side properties: each of these rules draws only one visible
-   edge, so recoloring all four is safe. */
-.search__input,
-.search__results,
-.manual__content td,
-.manual__pagination,
-.team + .team,
-.security__section,
-.air__section + .air__section,
-.sponsorship + .sponsorship,
-.meetups__embed,
-.rules,
-.rules__note,
-.brand__section + .brand__section,
-.brand__figure {
-  border-color: color-mix(in srgb, var(--omarchy-muted) 80%, transparent);
-}
-
-/* rgba(var(--rgb-terminal-black), 0.8) avatar rings drawn as box-shadow */
-.member__avatar,
-.resident__avatar {
-  box-shadow: 0 0 0 var(--border-width) color-mix(in srgb, var(--omarchy-muted) 80%, transparent);
-}
-
-.search__result {
-  border-top-color: color-mix(in srgb, var(--omarchy-muted) 50%, transparent);
-}
-
-.search__result--active,
-.search__result:hover {
-  background: color-mix(in srgb, var(--omarchy-muted) 45%, transparent);
-}
-
-.manual__content code {
-  background: color-mix(in srgb, var(--omarchy-muted) 50%, transparent);
-}
-
-/* Workstation photo caption chip: rgba(var(--rgb-white), 0.9) with
-   terminal-black text. Self-paired so it stays a foreground-colored chip with
-   background-colored text in both modes. */
-.workstations__image figure figcaption {
-  background: color-mix(in srgb, var(--omarchy-bright-foreground) 90%, transparent);
-  color: var(--omarchy-background);
-}
-
-/* Lightbox backdrop: rgba(var(--rgb-background-night), 0.9) over blur */
-.workstations__backdrop {
-  background: color-mix(in srgb, var(--omarchy-background) 90%, transparent);
-}
-
-/* The laseretch canvas masthead composites with mix-blend-mode: screen —
-   near-invisible over a light ground. In light mode drop to the site's own
-   static fallback (the themed <pre>), exactly as its reduced-motion path
-   does. !important here because the site hides the pre with its own
-   .wte-home rules while a canvas is live. */
-:root[data-omarchy-mode="light"] .pre__wte {
-  display: none !important;
-}
-
-:root[data-omarchy-mode="light"].wte-home .pre pre {
-  animation: none !important;
-  visibility: visible !important;
 }
