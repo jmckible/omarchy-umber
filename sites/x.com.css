@@ -1,0 +1,696 @@
+/* @match x.com, *://*.x.com/*, twitter.com, *://*.twitter.com/* */
+
+/* Omarchy palette for X.
+
+   X is three apps in one page, each with its own way of putting color on the
+   screen, and this file has a section per system:
+
+   1. The old app -- timeline, profile, settings -- is react-native-web. Its
+      static styles compile to atomic classes (one `.r-<hash>` per
+      declaration, in the runtime-injected `#react-native-stylesheet`), but
+      every color the THEME chooses at runtime is written onto the element's
+      `style` attribute instead. So the theme layer is reachable by `[style]`
+      substring selectors, keyed on the color literal rather than on a token
+      name, and author `!important` beats a non-important inline declaration.
+      This is the bulk of the app.
+   2. X Chat (where /messages now lands) and the Grok panes are a Tailwind-
+      shaped system over ~100 real `--x-*` custom properties on :root. That
+      one is an ordinary token remap and is the cheapest section here.
+   3. The newest widgets (the NFL/sports modules on Explore) are a third
+      system, `.jf-element` plus `j*` atomic classes, holding hardcoded
+      literals -- Tailwind's neutral/zinc scale -- behind an opacity variable.
+      That one is NOT themed; see the gaps note at the bottom.
+
+   The value table is X's own, read out of main.*.js: a 13-step gray ramp per
+   polarity (gray0 just off the canvas, gray1100 the primary text) plus named
+   surface colors. BOTH of X's dark backgrounds -- "Lights out" and "Dim" --
+   share one gray ramp and differ only in canvas/border/elevated, so the few
+   extra values needed for Dim are listed too and this file covers either.
+   X's light "Default" background is NOT covered: there #EFF3F4 flips from a
+   button fill to a surface and #0F1419 from button ink to body text, and one
+   literal cannot mean both. Keep X on a dark background (Settings > Display).
+
+   Three things worth knowing before editing:
+
+   * Selectors are pinned to their property. `[style*="color: X"]` also matches
+     `background-color: X`, so text rules match `[style^="color: X"]` (first
+     declaration) or `[style*="; color: X"]` (any later one) -- inline
+     serialization always joins declarations with "; ". Without that pinning a
+     grey chip carrying light text has its TEXT recolored to the chip's grey
+     and the label vanishes.
+
+   * Borders need no table. `#react-root *` (specificity 1,0,0) outranks any
+     single atomic class (0,1,0), so one blanket rule recolors every
+     class-applied border -- and it deliberately omits `!important` so that
+     X's inline `border-color: rgba(0, 0, 0, 0)` still wins. Those transparent
+     borders are load-bearing: they reserve layout for focus and selection
+     rings that must stay invisible until earned.
+
+   * The atomic block is the one place this file names hashed class names,
+     which is normally forbidden. It is here because the alternative is a black
+     center column: `[data-testid="primaryColumn"]`, the sidebar cards and the
+     avatar discs are all painted by class, not inline, and no durable selector
+     reaches the sidebar cards. The failure mode if a hash ever rotates is loud
+     and local -- that one surface reverts to X's own color, nothing breaks --
+     and the table regenerates in one paste from the live page:
+
+       s=[...document.styleSheets].find(x=>x.ownerNode.id==='react-native-stylesheet')
+       [...s.cssRules].map(r=>r.cssText).filter(t=>/^\.r-\S+ \{ (background-)?color:/.test(t))
+
+     The structural `[data-testid]` rules further down cover the same surfaces
+     where a stable anchor does exist, so a rotated hash degrades rather than
+     fails.
+
+   Left alone by design: post media, avatars, card thumbnails, and the black
+   scrims over them (`rgba(0, 0, 0, .3/.4/.77/.8)`) -- a scrim is dark in every
+   theme because it sits on a photograph, not on a surface. `#FFFFFF` text is
+   left for the same reason: X calls it `whiteOnColor` and only ever puts it on
+   a filled control or over media, both of which stay dark. The accent-colour
+   swatches on Settings > Display are left as literals too, since that grid is
+   a colour picker and has to show the colours it is offering. The one scrim
+   value that IS remapped is `rgba(0, 0, 0, .65)`: X uses it for the frosted
+   sticky header over the timeline, which is chrome, not media.
+
+   Known gap: the `.jf-element` widgets from system 3 keep X's own near-black
+   card fills and grey label text. They read as intentionally darker cards
+   under a dark theme and are wrong under a light one. They are left because
+   the only handle on them is `.jf-element` itself, which every one of their
+   743 nodes carries -- a blanket rule there erases the widget's internal
+   hairlines and flattens its hierarchy, and their per-element opacity variable
+   inherits, so it cannot be used to tell a painted node from a bare one.
+
+   The blue verified badge becomes the accent, because the class that colours
+   it is the same one that colours links, and links have to follow the accent.
+   Gold and grey badges use different classes and keep their own colours, so
+   the distinction that badge colour actually carries survives. */
+
+:root,
+:host {
+  --oma-canvas: var(--omarchy-background);
+  --oma-elevated: color-mix(in srgb, var(--omarchy-bright-foreground) 10%, var(--omarchy-background));
+  --oma-line: color-mix(in srgb, var(--omarchy-bright-foreground) 20%, var(--omarchy-background));
+
+  /* Hover/press wash. X ships these as translucent white, which can only
+     lighten; mixing the foreground into transparent also darkens under a
+     light theme. */
+  --oma-hover: color-mix(in srgb, var(--omarchy-bright-foreground) 8%, transparent);
+  --oma-active: color-mix(in srgb, var(--omarchy-bright-foreground) 16%, transparent);
+
+  --oma-accent: var(--omarchy-accent);
+  --oma-on-accent: var(--omarchy-background);
+  --oma-accent-soft: color-mix(in srgb, var(--omarchy-accent) 18%, var(--omarchy-background));
+
+  /* X's "black button" (Post, Follow, Subscribe) is an inverted ink pill. */
+  --oma-ink: var(--omarchy-bright-foreground);
+  --oma-on-ink: var(--omarchy-background);
+
+  /* X's gray ramp: g0 sits just off the canvas, g1100 is primary text. The
+     percentages are not eyeballed. For each of X's 13 steps, take its contrast
+     ratio against X's own black canvas, then solve for the mix of this
+     palette's background and bright_foreground that reproduces that ratio
+     against THIS canvas -- across all 23 dark Omarchy themes, and take the
+     median. Steps below are that fit. g700 -- the secondary text of every
+     handle, timestamp and metric on the site -- is raised past it to 66%,
+     the lowest value at which no Omarchy theme, of the 28 installed, drops
+     that text under 3:1 against its own canvas; the fitted 56% left two light
+     themes below it. Above g900 every theme saturates, so the two top steps
+     are just the palette's own two inks. */
+  --oma-g0: color-mix(in srgb, var(--omarchy-bright-foreground) 8%, var(--omarchy-background));
+  --oma-g50: color-mix(in srgb, var(--omarchy-bright-foreground) 12%, var(--omarchy-background));
+  --oma-g100: color-mix(in srgb, var(--omarchy-bright-foreground) 16%, var(--omarchy-background));
+  --oma-g200: color-mix(in srgb, var(--omarchy-bright-foreground) 21%, var(--omarchy-background));
+  --oma-g300: color-mix(in srgb, var(--omarchy-bright-foreground) 27%, var(--omarchy-background));
+  --oma-g400: color-mix(in srgb, var(--omarchy-bright-foreground) 34%, var(--omarchy-background));
+  --oma-g500: color-mix(in srgb, var(--omarchy-bright-foreground) 42%, var(--omarchy-background));
+  --oma-g600: color-mix(in srgb, var(--omarchy-bright-foreground) 50%, var(--omarchy-background));
+  --oma-g700: color-mix(in srgb, var(--omarchy-bright-foreground) 66%, var(--omarchy-background));
+  --oma-g800: color-mix(in srgb, var(--omarchy-bright-foreground) 78%, var(--omarchy-background));
+  --oma-g900: color-mix(in srgb, var(--omarchy-bright-foreground) 90%, var(--omarchy-background));
+  --oma-g1000: var(--omarchy-foreground);
+  --oma-g1100: var(--omarchy-bright-foreground);
+}
+
+/* ------------------------------------------------- X Chat's token system -- */
+
+/* X's newer surfaces -- X Chat (where /messages now lands), and the Grok and
+   Radar panes -- are a second, unrelated design system: Tailwind-shaped utility
+   classes over ~100 semantic custom properties. Those tokens live on :root for
+   the whole app, so remapping them here is free even on pages that never read
+   them, and it is the whole theme for the pages that do.
+
+   The selector list is load-bearing. X declares this block on
+   `:root, :root[data-theme="light"], [data-theme="light"], .light-theme` and
+   again on the dark trio, so an inner `[data-theme]` container re-declares
+   every token and resolves from itself, not from :root -- hence the repeated
+   attribute selectors and the `!important`, which is what actually beats X's
+   more specific `:root[data-theme="dark"]` on <html>.
+
+   `--x-black`, `--x-white` and `--x-overlay-*` are deliberately absent: they
+   are literal ink and modal/media scrims, dark in every theme. */
+
+:root,
+:host,
+[data-theme="light"],
+[data-theme="dark"],
+.light-theme,
+.dark-theme {
+  --x-bg-primary: var(--oma-canvas) !important;
+  --x-bg-secondary: var(--oma-g0) !important;
+  --x-bg-tertiary: var(--oma-g100) !important;
+  --x-bg-modal: var(--oma-elevated) !important;
+  --x-bg-sheets: var(--oma-elevated) !important;
+  --x-bg-inputs: color-mix(in srgb, var(--omarchy-foreground) 8%, transparent) !important;
+
+  --x-fg-primary: var(--oma-g1100) !important;
+  --x-fg-secondary: color-mix(in srgb, var(--omarchy-foreground) 68%, transparent) !important;
+  --x-fg-tertiary: color-mix(in srgb, var(--omarchy-foreground) 40%, transparent) !important;
+  --x-fg-inverted: var(--oma-on-ink) !important;
+  --x-fg-on-color: var(--oma-on-accent) !important;
+  --x-fg-brand: var(--oma-accent) !important;
+  --x-fg-destructive: var(--omarchy-red) !important;
+  --x-fg-success: var(--omarchy-green) !important;
+  --x-fg-warning: var(--omarchy-yellow) !important;
+  --x-fg-subscribe: var(--omarchy-magenta) !important;
+
+  --x-border-normal: color-mix(in srgb, var(--omarchy-foreground) 18%, transparent) !important;
+  --x-border-hover: color-mix(in srgb, var(--omarchy-foreground) 26%, transparent) !important;
+  --x-border-active: color-mix(in srgb, var(--omarchy-foreground) 36%, transparent) !important;
+  --x-border-elevated: color-mix(in srgb, var(--omarchy-foreground) 26%, transparent) !important;
+  --x-border-destructive: var(--omarchy-red) !important;
+  --x-border-destructive-light: color-mix(in srgb, var(--omarchy-red) 40%, var(--omarchy-background)) !important;
+  --x-ring: var(--oma-accent) !important;
+  --x-shadow-focus: 0 0 0 2px color-mix(in srgb, var(--oma-accent) 75%, transparent) !important;
+
+  --x-btn-primary: var(--oma-ink) !important;
+  --x-btn-primary-hover: color-mix(in srgb, var(--oma-ink) 85%, transparent) !important;
+  --x-btn-primary-pressed: color-mix(in srgb, var(--oma-ink) 72%, transparent) !important;
+  --x-btn-secondary: var(--oma-g100) !important;
+  --x-btn-secondary-hover: var(--oma-g200) !important;
+  --x-btn-secondary-pressed: var(--oma-g300) !important;
+  --x-btn-tertiary: color-mix(in srgb, var(--omarchy-foreground) 12%, transparent) !important;
+  --x-btn-tertiary-hover: color-mix(in srgb, var(--omarchy-foreground) 18%, transparent) !important;
+  --x-btn-tertiary-pressed: color-mix(in srgb, var(--omarchy-foreground) 24%, transparent) !important;
+  --x-btn-brand: var(--oma-accent) !important;
+  --x-btn-brand-hover: color-mix(in srgb, var(--oma-accent) 85%, var(--omarchy-foreground)) !important;
+  --x-btn-brand-pressed: color-mix(in srgb, var(--oma-accent) 70%, var(--omarchy-foreground)) !important;
+  --x-btn-inverted: var(--oma-canvas) !important;
+  --x-btn-inverted-hover: color-mix(in srgb, var(--oma-canvas) 90%, transparent) !important;
+  --x-btn-inverted-pressed: color-mix(in srgb, var(--oma-canvas) 80%, transparent) !important;
+  --x-btn-ghost-hover: var(--oma-hover) !important;
+  --x-btn-ghost-pressed: var(--oma-active) !important;
+  --x-btn-destructive: var(--omarchy-red) !important;
+  --x-btn-destructive-hover: color-mix(in srgb, var(--omarchy-red) 85%, var(--omarchy-foreground)) !important;
+  --x-btn-destructive-pressed: color-mix(in srgb, var(--omarchy-red) 70%, var(--omarchy-foreground)) !important;
+
+  --x-bg-destructive: color-mix(in srgb, var(--omarchy-red) 18%, var(--omarchy-background)) !important;
+  --x-bg-success: color-mix(in srgb, var(--omarchy-green) 18%, var(--omarchy-background)) !important;
+  --x-bg-warning: color-mix(in srgb, var(--omarchy-yellow) 18%, var(--omarchy-background)) !important;
+  --x-bg-info: var(--oma-accent-soft) !important;
+  --x-bg-subscribe: color-mix(in srgb, var(--omarchy-magenta) 18%, var(--omarchy-background)) !important;
+
+  --x-hover-subtle: var(--oma-hover) !important;
+  --x-toast-bg: color-mix(in srgb, var(--oma-elevated) 88%, transparent) !important;
+  --x-tooltip-bg: var(--oma-g900) !important;
+  --x-tooltip-fg: var(--oma-on-ink) !important;
+
+  /* X builds these two ramps out of literal white and literal black over its
+     own canvas. Mixing the palette's ink and ground instead keeps them honest
+     in both polarities. */
+  --x-fg-alpha-00: color-mix(in srgb, var(--omarchy-foreground) 0%, transparent) !important;
+  --x-fg-alpha-05: color-mix(in srgb, var(--omarchy-foreground) 5%, transparent) !important;
+  --x-fg-alpha-10: color-mix(in srgb, var(--omarchy-foreground) 10%, transparent) !important;
+  --x-fg-alpha-15: color-mix(in srgb, var(--omarchy-foreground) 15%, transparent) !important;
+  --x-fg-alpha-20: color-mix(in srgb, var(--omarchy-foreground) 20%, transparent) !important;
+  --x-fg-alpha-30: color-mix(in srgb, var(--omarchy-foreground) 30%, transparent) !important;
+  --x-fg-alpha-40: color-mix(in srgb, var(--omarchy-foreground) 40%, transparent) !important;
+  --x-fg-alpha-50: color-mix(in srgb, var(--omarchy-foreground) 50%, transparent) !important;
+  --x-fg-alpha-60: color-mix(in srgb, var(--omarchy-foreground) 60%, transparent) !important;
+  --x-fg-alpha-70: color-mix(in srgb, var(--omarchy-foreground) 70%, transparent) !important;
+  --x-fg-alpha-80: color-mix(in srgb, var(--omarchy-foreground) 80%, transparent) !important;
+  --x-fg-alpha-85: color-mix(in srgb, var(--omarchy-foreground) 85%, transparent) !important;
+  --x-fg-alpha-90: color-mix(in srgb, var(--omarchy-foreground) 90%, transparent) !important;
+  --x-fg-alpha-95: color-mix(in srgb, var(--omarchy-foreground) 95%, transparent) !important;
+  --x-fg-alpha-100: var(--omarchy-foreground) !important;
+
+  --x-bg-alpha-00: color-mix(in srgb, var(--omarchy-background) 0%, transparent) !important;
+  --x-bg-alpha-05: color-mix(in srgb, var(--omarchy-background) 5%, transparent) !important;
+  --x-bg-alpha-10: color-mix(in srgb, var(--omarchy-background) 10%, transparent) !important;
+  --x-bg-alpha-15: color-mix(in srgb, var(--omarchy-background) 15%, transparent) !important;
+  --x-bg-alpha-20: color-mix(in srgb, var(--omarchy-background) 20%, transparent) !important;
+  --x-bg-alpha-30: color-mix(in srgb, var(--omarchy-background) 30%, transparent) !important;
+  --x-bg-alpha-40: color-mix(in srgb, var(--omarchy-background) 40%, transparent) !important;
+  --x-bg-alpha-50: color-mix(in srgb, var(--omarchy-background) 50%, transparent) !important;
+  --x-bg-alpha-60: color-mix(in srgb, var(--omarchy-background) 60%, transparent) !important;
+  --x-bg-alpha-70: color-mix(in srgb, var(--omarchy-background) 70%, transparent) !important;
+  --x-bg-alpha-80: color-mix(in srgb, var(--omarchy-background) 80%, transparent) !important;
+  --x-bg-alpha-85: color-mix(in srgb, var(--omarchy-background) 85%, transparent) !important;
+  --x-bg-alpha-90: color-mix(in srgb, var(--omarchy-background) 90%, transparent) !important;
+  --x-bg-alpha-95: color-mix(in srgb, var(--omarchy-background) 95%, transparent) !important;
+  --x-bg-alpha-100: var(--omarchy-background) !important;
+}
+
+/* ---------------------------------------------------------------- canvas -- */
+
+/* Native scrollbars, form controls and <select> popups follow the desktop
+   mode, not the `color-scheme: dark` X stamps on <html> -- which is also what
+   decides the UA link color, hence the `a` rule at the bottom of this file.
+   X writes it as an INLINE style, so these need `!important` to land. */
+:root[data-omarchy-mode="dark"] { color-scheme: dark !important; }
+:root[data-omarchy-mode="light"] { color-scheme: light !important; }
+
+:root {
+  scrollbar-color: var(--oma-g400) var(--omarchy-background);
+}
+
+body {
+  background-color: var(--oma-canvas) !important;
+  color: var(--oma-g1100) !important;
+}
+
+::selection {
+  background-color: var(--omarchy-selection-background);
+  color: var(--omarchy-selection-foreground);
+}
+
+/* -------------------------------------------- theme layer: inline surface -- */
+
+/* Canvas. #000000/#050505 is "Lights out", #15202B/#010C12 is "Dim". Also the
+   disc painted behind every avatar image. */
+[style*="background-color: rgb(0, 0, 0)"],
+[style*="background-color: rgb(5, 5, 5)"],
+[style*="background-color: rgb(21, 32, 43)"],
+[style*="background-color: rgb(1, 12, 18)"] {
+  background-color: var(--oma-canvas) !important;
+}
+
+/* Raised: dropdown menus, dialogs, the media viewer's chrome. */
+[style*="background-color: rgb(27, 32, 35)"],
+[style*="background-color: rgb(20, 20, 20)"],
+[style*="background-color: rgb(28, 44, 60)"] {
+  background-color: var(--oma-elevated) !important;
+}
+
+/* Unread DM / notification cell. */
+[style*="background-color: rgb(4, 23, 34)"],
+[style*="background-color: rgb(36, 64, 82)"] {
+  background-color: var(--oma-accent-soft) !important;
+}
+
+[style*="background-color: rgba(255, 255, 255, 0.03)"] {
+  background-color: var(--oma-hover) !important;
+}
+
+[style*="background-color: rgba(255, 255, 255, 0.07)"],
+[style*="background-color: rgba(255, 255, 255, 0.1)"] {
+  background-color: var(--oma-active) !important;
+}
+
+/* Translucent chrome: the app bar, and the chip behind the composer's
+   toolbar scroll arrows. */
+[style*="background-color: rgba(15, 20, 25, 0.75)"],
+[style*="background-color: rgba(18, 21, 23, 0.7)"],
+[style*="background-color: rgba(20, 29, 38, 0.7)"],
+[style*="background-color: rgba(21, 32, 43, 0.75)"] {
+  background-color: color-mix(in srgb, var(--oma-canvas) 78%, transparent) !important;
+}
+
+/* Grey fills: chips, the search field, skeletons, disabled buttons. */
+[style*="background-color: rgb(22, 24, 28)"] { background-color: var(--oma-g0) !important; }
+[style*="background-color: rgb(32, 35, 39)"] { background-color: var(--oma-g50) !important; }
+[style*="background-color: rgb(42, 45, 48)"] { background-color: var(--oma-g100) !important; }
+[style*="background-color: rgb(51, 54, 57)"] { background-color: var(--oma-g200) !important; }
+[style*="background-color: rgb(62, 65, 68)"] { background-color: var(--oma-g300) !important; }
+[style*="background-color: rgb(75, 78, 82)"] { background-color: var(--oma-g400) !important; }
+[style*="background-color: rgb(89, 93, 98)"] { background-color: var(--oma-g500) !important; }
+[style*="background-color: rgb(113, 118, 123)"] { background-color: var(--oma-g700) !important; }
+[style*="background-color: rgb(83, 100, 113)"] { background-color: var(--oma-g600) !important; }
+[style*="background-color: rgb(207, 217, 222)"] { background-color: var(--oma-g800) !important; }
+
+/* #0F1419 is the ink of X's light ramp, but as a FILL under a dark background
+   it is the collapsed nav's compose button -- a disc that has to read as
+   raised, not as a hole. */
+[style*="background-color: rgb(15, 20, 25)"] { background-color: var(--oma-g0) !important; }
+
+/* Hairlines drawn as a 1px background rather than as a border. */
+[style*="background-color: rgb(47, 51, 54)"],
+[style*="background-color: rgb(56, 68, 77)"],
+[style*="background-color: rgb(61, 65, 69)"] {
+  background-color: var(--oma-line) !important;
+}
+
+/* Filled controls. */
+[style*="background-color: rgb(29, 155, 240)"] { background-color: var(--oma-accent) !important; }
+[style*="background-color: rgb(239, 243, 244)"],
+[style*="background-color: rgb(247, 249, 249)"],
+[style*="background-color: rgb(255, 255, 255)"] { background-color: var(--oma-ink) !important; }
+[style*="background-color: rgb(244, 33, 46)"] { background-color: var(--omarchy-red) !important; }
+[style*="background-color: rgb(249, 24, 128)"] { background-color: var(--omarchy-magenta) !important; }
+[style*="background-color: rgb(0, 186, 124)"] { background-color: var(--omarchy-green) !important; }
+
+/* --------------------------------------------------------- status washes -- */
+
+/* Promo banners, warning strips and badge chips are filled with the dark end of
+   one of X's nine hue ramps (levels 0/50/100/200 of blue, green, red, magenta,
+   orange, yellow, purple, teal, plum -- read from the same theme module). Each
+   tint keeps its hue but is rebuilt out of the palette so it sits on the
+   Omarchy canvas at the same weight, in either polarity. */
+
+/* blue */
+[style*="background-color: rgb(2, 17, 61)"],
+[style*="background-color: rgb(0, 21, 74)"] {
+  background-color: color-mix(in srgb, var(--omarchy-accent) 10%, var(--omarchy-background)) !important;
+}
+[style*="background-color: rgb(0, 56, 134)"] {
+  background-color: color-mix(in srgb, var(--omarchy-accent) 18%, var(--omarchy-background)) !important;
+}
+[style*="background-color: rgb(0, 90, 194)"] {
+  background-color: color-mix(in srgb, var(--omarchy-accent) 28%, var(--omarchy-background)) !important;
+}
+
+/* green */
+[style*="background-color: rgb(0, 34, 24)"],
+[style*="background-color: rgb(0, 37, 26)"] {
+  background-color: color-mix(in srgb, var(--omarchy-green) 10%, var(--omarchy-background)) !important;
+}
+[style*="background-color: rgb(0, 67, 41)"] {
+  background-color: color-mix(in srgb, var(--omarchy-green) 18%, var(--omarchy-background)) !important;
+}
+[style*="background-color: rgb(0, 97, 61)"] {
+  background-color: color-mix(in srgb, var(--omarchy-green) 28%, var(--omarchy-background)) !important;
+}
+
+/* red */
+[style*="background-color: rgb(61, 1, 5)"],
+[style*="background-color: rgb(68, 0, 4)"] {
+  background-color: color-mix(in srgb, var(--omarchy-red) 10%, var(--omarchy-background)) !important;
+}
+[style*="background-color: rgb(103, 7, 15)"] {
+  background-color: color-mix(in srgb, var(--omarchy-red) 18%, var(--omarchy-background)) !important;
+}
+[style*="background-color: rgb(138, 13, 32)"] {
+  background-color: color-mix(in srgb, var(--omarchy-red) 28%, var(--omarchy-background)) !important;
+}
+
+/* magenta */
+[style*="background-color: rgb(55, 1, 28)"],
+[style*="background-color: rgb(63, 0, 31)"] {
+  background-color: color-mix(in srgb, var(--omarchy-magenta) 10%, var(--omarchy-background)) !important;
+}
+[style*="background-color: rgb(100, 5, 51)"] {
+  background-color: color-mix(in srgb, var(--omarchy-magenta) 18%, var(--omarchy-background)) !important;
+}
+[style*="background-color: rgb(137, 10, 70)"] {
+  background-color: color-mix(in srgb, var(--omarchy-magenta) 28%, var(--omarchy-background)) !important;
+}
+
+/* orange */
+[style*="background-color: rgb(60, 18, 1)"],
+[style*="background-color: rgb(73, 22, 0)"] {
+  background-color: color-mix(in srgb, var(--omarchy-orange) 10%, var(--omarchy-background)) !important;
+}
+[style*="background-color: rgb(105, 33, 0)"] {
+  background-color: color-mix(in srgb, var(--omarchy-orange) 18%, var(--omarchy-background)) !important;
+}
+[style*="background-color: rgb(137, 43, 0)"] {
+  background-color: color-mix(in srgb, var(--omarchy-orange) 28%, var(--omarchy-background)) !important;
+}
+
+/* yellow */
+[style*="background-color: rgb(61, 30, 2)"],
+[style*="background-color: rgb(72, 35, 0)"] {
+  background-color: color-mix(in srgb, var(--omarchy-yellow) 10%, var(--omarchy-background)) !important;
+}
+[style*="background-color: rgb(111, 62, 0)"] {
+  background-color: color-mix(in srgb, var(--omarchy-yellow) 18%, var(--omarchy-background)) !important;
+}
+[style*="background-color: rgb(149, 89, 0)"] {
+  background-color: color-mix(in srgb, var(--omarchy-yellow) 28%, var(--omarchy-background)) !important;
+}
+
+/* purple */
+[style*="background-color: rgb(22, 6, 52)"],
+[style*="background-color: rgb(25, 0, 74)"] {
+  background-color: color-mix(in srgb, var(--omarchy-purple) 10%, var(--omarchy-background)) !important;
+}
+[style*="background-color: rgb(44, 17, 110)"] {
+  background-color: color-mix(in srgb, var(--omarchy-purple) 18%, var(--omarchy-background)) !important;
+}
+[style*="background-color: rgb(63, 34, 146)"] {
+  background-color: color-mix(in srgb, var(--omarchy-purple) 28%, var(--omarchy-background)) !important;
+}
+
+/* teal */
+[style*="background-color: rgb(2, 32, 35)"],
+[style*="background-color: rgb(0, 34, 37)"] {
+  background-color: color-mix(in srgb, var(--omarchy-cyan) 10%, var(--omarchy-background)) !important;
+}
+[style*="background-color: rgb(0, 62, 66)"] {
+  background-color: color-mix(in srgb, var(--omarchy-cyan) 18%, var(--omarchy-background)) !important;
+}
+[style*="background-color: rgb(0, 90, 95)"] {
+  background-color: color-mix(in srgb, var(--omarchy-cyan) 28%, var(--omarchy-background)) !important;
+}
+
+/* plum */
+[style*="background-color: rgb(45, 3, 45)"],
+[style*="background-color: rgb(52, 0, 53)"] {
+  background-color: color-mix(in srgb, var(--omarchy-purple) 10%, var(--omarchy-background)) !important;
+}
+[style*="background-color: rgb(82, 11, 83)"] {
+  background-color: color-mix(in srgb, var(--omarchy-purple) 18%, var(--omarchy-background)) !important;
+}
+[style*="background-color: rgb(112, 22, 113)"] {
+  background-color: color-mix(in srgb, var(--omarchy-purple) 28%, var(--omarchy-background)) !important;
+}
+
+/* ----------------------------------------------- theme layer: inline text -- */
+
+[style^="color: rgb(231, 233, 234)"],
+[style*="; color: rgb(231, 233, 234)"] { color: var(--oma-g1100) !important; }
+
+[style^="color: rgb(214, 217, 219)"],
+[style*="; color: rgb(214, 217, 219)"] { color: var(--oma-g1000) !important; }
+
+[style^="color: rgb(182, 185, 188)"],
+[style*="; color: rgb(182, 185, 188)"] { color: var(--oma-g900) !important; }
+
+[style^="color: rgb(145, 150, 154)"],
+[style*="; color: rgb(145, 150, 154)"] { color: var(--oma-g800) !important; }
+
+[style^="color: rgb(113, 118, 123)"],
+[style*="; color: rgb(113, 118, 123)"] { color: var(--oma-g700) !important; }
+
+[style^="color: rgb(100, 105, 109)"],
+[style*="; color: rgb(100, 105, 109)"] { color: var(--oma-g600) !important; }
+
+[style^="color: rgb(89, 93, 98)"],
+[style*="; color: rgb(89, 93, 98)"] { color: var(--oma-g500) !important; }
+
+[style^="color: rgb(75, 78, 82)"],
+[style*="; color: rgb(75, 78, 82)"] { color: var(--oma-g400) !important; }
+
+[style^="color: rgb(62, 65, 68)"],
+[style*="; color: rgb(62, 65, 68)"] { color: var(--oma-g300) !important; }
+
+[style^="color: rgb(51, 54, 57)"],
+[style*="; color: rgb(51, 54, 57)"] { color: var(--oma-g200) !important; }
+
+/* Placeholder / muted label grey, borrowed from X's light ramp. */
+[style^="color: rgb(83, 100, 113)"],
+[style*="; color: rgb(83, 100, 113)"] { color: var(--oma-g600) !important; }
+
+/* #EFF3F4 doubles as the ink-pill fill and as the brightest icon color. */
+[style^="color: rgb(239, 243, 244)"],
+[style*="; color: rgb(239, 243, 244)"],
+[style^="color: rgb(247, 249, 249)"],
+[style*="; color: rgb(247, 249, 249)"] { color: var(--oma-g1100) !important; }
+
+/* Links, mentions, hashtags, and the like/repost/reply active states. */
+[style^="color: rgb(29, 155, 240)"],
+[style*="; color: rgb(29, 155, 240)"],
+[style^="color: rgb(67, 179, 246)"],
+[style*="; color: rgb(67, 179, 246)"] { color: var(--oma-accent) !important; }
+
+[style^="color: rgb(244, 33, 46)"],
+[style*="; color: rgb(244, 33, 46)"] { color: var(--omarchy-red) !important; }
+
+[style^="color: rgb(249, 24, 128)"],
+[style*="; color: rgb(249, 24, 128)"] { color: var(--omarchy-magenta) !important; }
+
+[style^="color: rgb(0, 186, 124)"],
+[style*="; color: rgb(0, 186, 124)"] { color: var(--omarchy-green) !important; }
+
+/* ------------------------------------------- static layer: atomic classes -- */
+
+/* One class per declaration, value in the comment. Regenerate with the snippet
+   in the file header if a hash ever stops matching. */
+
+.r-kemksi  { background-color: var(--oma-canvas) !important; }   /* #000000 */
+.r-cl2sl0  { background-color: var(--oma-elevated) !important; } /* #141414 */
+.r-1xsd2s  { background-color: var(--oma-elevated) !important; } /* #1B2023 */
+.r-g2wdr4  { background-color: var(--oma-g0) !important; }       /* #16181C */
+.r-z32n2g  { background-color: var(--oma-g50) !important; }      /* #202327 */
+.r-1fkb3t2 { background-color: var(--oma-g100) !important; }     /* #2A2D30 */
+.r-1bnu78o { background-color: var(--oma-g200) !important; }     /* #333639 */
+.r-1shrkeu { background-color: var(--oma-g300) !important; }     /* #3E4144 */
+.r-3gvs5h  { background-color: var(--oma-g700) !important; }     /* #71767B */
+.r-1cf81hf { background-color: var(--oma-g600) !important; }     /* #536471 */
+.r-1bimlpy { background-color: var(--oma-g800) !important; }     /* #CFD9DE */
+.r-gu4em3  { background-color: var(--oma-line) !important; }     /* #2F3336 */
+
+/* The frosted sticky header over the timeline: black at .65 behind a 12px
+   backdrop blur. It is chrome, not a scrim over media, so it becomes a
+   translucent canvas rather than staying black. */
+.r-5zmot {
+  background-color: color-mix(in srgb, var(--oma-canvas) 65%, transparent) !important;
+}
+
+.r-l5o3uw  { background-color: var(--oma-accent) !important; }   /* #1D9BF0 */
+.r-1sw30gj { background-color: var(--oma-ink) !important; }      /* #EFF3F4 */
+.r-x572qd  { background-color: var(--oma-ink) !important; }      /* #F7F9F9 */
+.r-14lw9ot { background-color: var(--oma-ink) !important; }      /* #FFFFFF */
+.r-1m3jxhj { background-color: var(--oma-g0) !important; }       /* #0F1419 */
+.r-1f4tc2a { background-color: var(--omarchy-red) !important; }     /* #F4212E */
+.r-4nw3r4  { background-color: var(--omarchy-magenta) !important; } /* #F91880 */
+.r-s224ru  { background-color: var(--omarchy-green) !important; }   /* #00BA7C */
+
+.r-1nao33i { color: var(--oma-g1100) !important; }   /* #E7E9EA */
+.r-54znze  { color: var(--oma-g1100) !important; }   /* #EFF3F4 */
+.r-1ion2gp { color: var(--oma-g900) !important; }    /* #B6B9BC */
+.r-1bwzh9t { color: var(--oma-g700) !important; }    /* #71767B */
+.r-14j79pv { color: var(--oma-g600) !important; }    /* #536471 */
+.r-1q89gc9 { color: var(--oma-g500) !important; }    /* #595D62 */
+.r-165ghr7 { color: var(--oma-g300) !important; }    /* #3E4144 */
+.r-1otekoa { color: var(--oma-g200) !important; }    /* #333639 */
+.r-9e4p39  { color: var(--oma-g100) !important; }    /* #2A2D30 */
+.r-1cvl2hr { color: var(--oma-accent) !important; }  /* #1D9BF0 */
+.r-9l7dzd  { color: var(--omarchy-red) !important; }     /* #F4212E */
+.r-vkub15  { color: var(--omarchy-magenta) !important; } /* #F91880 */
+.r-o6sn0f  { color: var(--omarchy-green) !important; }   /* #00BA7C */
+
+/* The composer's placeholder is DraftJS's, not X's: it takes X's secondary
+   grey from the `draftjs-styles` <style> block, keyed on DraftJS's own stable
+   public class rather than on an atomic one. */
+.public-DraftEditorPlaceholder-root {
+  color: var(--oma-g700) !important;
+}
+
+/* ------------------------------------------------ ink on a filled control -- */
+
+/* Last, so they beat both tables above for an element carrying a fill and its
+   own label color. */
+[style*="background-color: rgb(239, 243, 244)"],
+[style*="background-color: rgb(247, 249, 249)"],
+[style*="background-color: rgb(255, 255, 255)"],
+[style*="background-color: rgb(239, 243, 244)"] *,
+[style*="background-color: rgb(247, 249, 249)"] *,
+[style*="background-color: rgb(255, 255, 255)"] *,
+.r-1sw30gj, .r-1sw30gj *,
+.r-x572qd, .r-x572qd *,
+.r-14lw9ot, .r-14lw9ot * {
+  color: var(--oma-on-ink) !important;
+}
+
+[style*="background-color: rgb(29, 155, 240)"],
+[style*="background-color: rgb(29, 155, 240)"] *,
+.r-l5o3uw, .r-l5o3uw * {
+  color: var(--oma-on-accent) !important;
+}
+
+[style^="color: rgb(15, 20, 25)"],
+[style*="; color: rgb(15, 20, 25)"],
+.r-18jsvk2 { color: var(--oma-on-ink) !important; }
+
+/* The text caret in the search field and the composer is X's blue, set by a
+   class rather than inline. */
+#react-root input,
+#react-root textarea,
+#react-root [contenteditable="true"],
+#react-root [contenteditable="true"] * {
+  caret-color: var(--oma-accent);
+}
+
+/* --------------------------------------------------------------- borders -- */
+
+/* Deliberately not `!important`: an id outranks any atomic class, so this
+   recolors every class-applied border while X's inline transparent borders
+   still win. See the file header. */
+#react-root * {
+  border-color: var(--oma-line);
+}
+
+/* Two things the blanket is too broad for, both of which have to be handed
+   back afterwards -- `!important`, because the blanket outranks a bare class.
+
+   1. Borders X makes transparent BY CLASS rather than inline. Same job as the
+      inline transparent ones: reserving 1-2px of layout for a focus or hover
+      ring that must not show yet. The blanket turns them into visible boxes,
+      which is how this was found -- three of them around the lightbox chrome.
+   2. The loading spinner, which is a rotating ring drawn as three accent
+      border sides and one transparent one. Flatten all four to the divider
+      colour and it stops reading as a spinner at all: just a grey circle.
+
+   The transparent re-assertions come second on purpose: react-native-web never
+   puts two atomic classes for the same property on one element, but if that
+   ever changed, staying invisible is the safer way to lose. */
+.r-1kqyzh3 { border-left-color: var(--oma-accent) !important; }
+.r-1khm80z { border-right-color: var(--oma-accent) !important; }
+.r-v35349 { border-bottom-color: var(--oma-accent) !important; }
+
+.r-42olwf { border-color: transparent !important; }
+.r-pp7rqf { border-right-color: transparent !important; }
+.r-snaw8h { border-left-color: transparent !important; }
+.r-oucylx { border-bottom-color: transparent !important; }
+
+/* The focus ring, the caret, and the progress gradient are the last three
+   places X spends its brand blue, none of them through `color`. */
+.r-9cip40 { box-shadow: var(--oma-accent) 0 0 0 1px !important; }
+.r-nf76sl { caret-color: var(--oma-accent) !important; }
+.r-1bnrybb {
+  background-image: linear-gradient(
+    90deg,
+    var(--oma-accent),
+    color-mix(in srgb, var(--oma-accent) 55%, var(--omarchy-bright-foreground))
+  ) !important;
+}
+
+/* An inline border color, though, is a real one and does need remapping. */
+[style*="border-color: rgb(47, 51, 54)"],
+[style*="border-color: rgb(56, 68, 77)"],
+[style*="border-color: rgb(61, 65, 69)"],
+[style*="border-color: rgb(51, 54, 57)"],
+[style*="border-color: rgb(75, 78, 82)"],
+[style*="border-color: rgb(83, 100, 113)"] {
+  border-color: var(--oma-line) !important;
+}
+
+[style*="border-color: rgb(29, 155, 240)"] { border-color: var(--oma-accent) !important; }
+
+/* ------------------------------------------------------------ structural -- */
+
+/* Canvas on the two column shells, from a stable anchor rather than a hash, so
+   the largest surfaces survive an atomic-class rotation. Not `!important`:
+   an inline surface color inside them is a real opinion and should win. */
+#react-root [data-testid="primaryColumn"],
+#react-root [data-testid="sidebarColumn"] {
+  background-color: var(--oma-canvas);
+}
+
+/* The floating Grok and Chat buttons are the one piece of chrome X lifts with
+   a WHITE glow rather than a dark shadow (`rgba(255,255,255,.2)`), over a
+   black-alpha pill. Both assumptions invert under a light Omarchy theme, so
+   both are rebuilt from the palette here. Everything else X elevates uses a
+   black shadow, which is right in either polarity and is left alone. */
+#react-root [data-testid="GrokDrawerHeader"],
+#react-root [data-testid="chat-drawer-main"] {
+  background-color: var(--oma-elevated) !important;
+  box-shadow:
+    0 0 15px color-mix(in srgb, var(--omarchy-foreground) 18%, transparent),
+    0 0 3px 1px color-mix(in srgb, var(--omarchy-foreground) 14%, transparent);
+}
+
+/* A link with no color of its own falls back to the UA's -webkit-link, which
+   tracks color-scheme and lands on periwinkle over a dark page. */
+#react-root a {
+  color: var(--oma-accent);
+}

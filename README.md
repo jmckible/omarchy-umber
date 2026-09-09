@@ -44,6 +44,8 @@ Then restart the browser.
 
 > `sites/github.com.css` points GitHub's syntax highlighting at the palette's ANSI colors and its `--fontStack-monospace` token at `JetBrainsMono Nerd Font`, so a diff reads like the same file in your terminal. That font is Omarchy's default but it is matched by name from the local system — on a machine without it, code falls back to GitHub's own stack and only the colors carry over.
 
+> `sites/x.com.css` assumes X's own Background setting is **Lights out** or **Dim** (Settings › Display); it covers either. X's light *Default* background is not covered, because there the same two literals that mean "button fill" and "button ink" in a dark theme mean "page surface" and "body text" instead, and one value can't be both.
+
 ## Site styles
 
 One CSS file per site in `~/.config/umber/sites/`, scoped by a comment header:
@@ -79,6 +81,8 @@ Mode-specific rules scope off an attribute Umber sets for you. Radio's LCD is li
 ```
 
 And where a site has no tokens to borrow, you're writing selectors instead — where durable ones matter more than clever ones. `gmail.css` targets Gmail's short classnames (`.zA`, `.aeN`, `.T-I`), stable for a decade, and the `#gb` id rather than the `gb_*` classes that rotate weekly. Anything long, digit-heavy or hash-like is generated — don't target it.
+
+`x.com.css` is the one starter that breaks that last rule, and it's worth reading for how it earns the exception. X writes every color its theme picks as an *inline* style, so most of that file is still a value map — keyed on the color literal instead of on a selector — but a few surfaces, the timeline column's own background among them, are painted only by react-native-web's `.r-<hash>` classes. Those hashes are content-addressed rather than build-randomized, a rotated one degrades to X's own color instead of breaking the page, structural `data-testid` rules back up the surfaces that matter, and the file carries the snippet that regenerates the whole table from the live page.
 
 ## Theming a site nothing covers yet
 
