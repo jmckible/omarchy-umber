@@ -1,0 +1,419 @@
+/* @match *://github.com/*, *://gist.github.com/* */
+/* Omarchy palette for GitHub (Primer).
+
+   GitHub ships the Primer design-token set on <html> and reads essentially the
+   whole UI out of it, so remapping tokens is the theme. Two properties of that
+   set make this file much smaller than it looks like it should be:
+
+   1. The token graph is heavily var()-chained. Of the ~960 properties in the
+      theme bundle only ~280 carry a literal color; everything else is an alias
+      (`--button-default-bgColor-rest: var(--control-bgColor-rest)`, all of
+      `--color-*` pointing at the modern names, most of `--codeMirror-*`,
+      `--counter-*`, `--progressBar-*`, `--tooltip-*`). Override the literals
+      and the aliases follow for free. Only literal-valued tokens are listed
+      below — anything absent here is deliberately inherited through an alias.
+   2. GitHub declares the block exactly once, on <html>, keyed by
+      `[data-color-mode][data-dark-theme=…]`. There is no inner theme container
+      to chase (Reddit's trap), but those selectors are three attributes deep,
+      so `:root` alone loses on specificity — hence `!important` throughout.
+      The light and dark bundles define the SAME names, so this one map covers
+      GitHub's own light and dark settings as well as both Omarchy modes.
+
+   Shades are derived by mixing background toward foreground, which raises a
+   surface in dark themes and lowers it in light ones — polarity-correct both
+   ways. `--omarchy-darker-background` is genuinely darker than the canvas in
+   every theme (verified against flexoki-light), so it carries the recessed
+   "inset" role.
+
+   Emphasis fills use the raw palette hue and put `--omarchy-background` on top
+   of them rather than white: an Omarchy hue contrasts its own background by
+   construction, in both polarities, which white does not.
+
+   Syntax highlighting maps to the palette's ANSI colors, so a diff reads like
+   the same code in the terminal — and `--fontStack-monospace` is pointed at
+   the terminal font to finish the effect.
+
+   Left alone on purpose: `--display-*` and `--label-*` (issue-label and
+   user-chosen chip colors), `--data-*` (Insights charts), avatars, README
+   images and any embedded content. */
+
+:root,
+:host {
+  /* Surface ladder: inset is recessed, 1–4 progressively raised. */
+  --oma-inset: var(--omarchy-darker-background);
+  --oma-0: var(--omarchy-background);
+  --oma-1: color-mix(in srgb, var(--omarchy-foreground) 5%, var(--omarchy-background));
+  --oma-2: color-mix(in srgb, var(--omarchy-foreground) 9%, var(--omarchy-background));
+  --oma-3: color-mix(in srgb, var(--omarchy-foreground) 14%, var(--omarchy-background));
+  --oma-4: color-mix(in srgb, var(--omarchy-foreground) 20%, var(--omarchy-background));
+
+  --oma-line-weak: color-mix(in srgb, var(--omarchy-foreground) 12%, var(--omarchy-background));
+  --oma-line: color-mix(in srgb, var(--omarchy-foreground) 20%, var(--omarchy-background));
+  --oma-line-strong: color-mix(in srgb, var(--omarchy-foreground) 38%, var(--omarchy-background));
+
+  --oma-text: var(--omarchy-foreground);
+  --oma-text-strong: var(--omarchy-bright-foreground);
+  --oma-text-muted: color-mix(in srgb, var(--omarchy-foreground) 66%, var(--omarchy-background));
+  --oma-text-faint: color-mix(in srgb, var(--omarchy-foreground) 45%, var(--omarchy-background));
+
+  /* Translucent tints — these sit over whatever surface is behind them, the
+     way Primer's own alpha values do, so they need no polarity handling. */
+  --oma-accent-t15: color-mix(in srgb, var(--omarchy-accent) 15%, transparent);
+  --oma-accent-t40: color-mix(in srgb, var(--omarchy-accent) 40%, transparent);
+  --oma-red-t15: color-mix(in srgb, var(--omarchy-red) 15%, transparent);
+  --oma-red-t40: color-mix(in srgb, var(--omarchy-red) 40%, transparent);
+  --oma-green-t15: color-mix(in srgb, var(--omarchy-green) 15%, transparent);
+  --oma-green-t40: color-mix(in srgb, var(--omarchy-green) 40%, transparent);
+  --oma-yellow-t15: color-mix(in srgb, var(--omarchy-yellow) 15%, transparent);
+  --oma-yellow-t40: color-mix(in srgb, var(--omarchy-yellow) 40%, transparent);
+  --oma-orange-t15: color-mix(in srgb, var(--omarchy-orange) 15%, transparent);
+  --oma-orange-t40: color-mix(in srgb, var(--omarchy-orange) 40%, transparent);
+  --oma-purple-t15: color-mix(in srgb, var(--omarchy-purple) 15%, transparent);
+  --oma-purple-t40: color-mix(in srgb, var(--omarchy-purple) 40%, transparent);
+  --oma-magenta-t15: color-mix(in srgb, var(--omarchy-magenta) 15%, transparent);
+  --oma-magenta-t40: color-mix(in srgb, var(--omarchy-magenta) 40%, transparent);
+  --oma-fg-t10: color-mix(in srgb, var(--omarchy-foreground) 10%, transparent);
+  --oma-fg-t20: color-mix(in srgb, var(--omarchy-foreground) 20%, transparent);
+  --oma-fg-t25: color-mix(in srgb, var(--omarchy-foreground) 25%, transparent);
+
+  --oma-shadow-cast: color-mix(in srgb, var(--omarchy-darker-background) 60%, transparent);
+
+  /* Solid fills that carry `--fgColor-onEmphasis` text. Pulling the hue a
+     fifth of the way toward the foreground pushes it AWAY from the canvas in
+     both polarities, which is what makes background-colored text on top of it
+     legible: an Omarchy hue alone is often only a mid-tone (flexoki-light's
+     green against its paper canvas was the case that forced this). Hover and
+     active keep going in the same direction, so a control still intensifies
+     on interaction in dark and light alike. */
+  --oma-accent-solid: color-mix(in srgb, var(--omarchy-accent) 80%, var(--omarchy-foreground));
+  --oma-accent-solid-hover: color-mix(in srgb, var(--omarchy-accent) 68%, var(--omarchy-foreground));
+  --oma-accent-solid-active: color-mix(in srgb, var(--omarchy-accent) 58%, var(--omarchy-foreground));
+  --oma-green-solid: color-mix(in srgb, var(--omarchy-green) 80%, var(--omarchy-foreground));
+  --oma-green-solid-hover: color-mix(in srgb, var(--omarchy-green) 68%, var(--omarchy-foreground));
+  --oma-green-solid-active: color-mix(in srgb, var(--omarchy-green) 58%, var(--omarchy-foreground));
+  --oma-red-solid: color-mix(in srgb, var(--omarchy-red) 80%, var(--omarchy-foreground));
+  --oma-red-solid-hover: color-mix(in srgb, var(--omarchy-red) 68%, var(--omarchy-foreground));
+  --oma-yellow-solid: color-mix(in srgb, var(--omarchy-yellow) 80%, var(--omarchy-foreground));
+  --oma-orange-solid: color-mix(in srgb, var(--omarchy-orange) 80%, var(--omarchy-foreground));
+  --oma-purple-solid: color-mix(in srgb, var(--omarchy-purple) 80%, var(--omarchy-foreground));
+  --oma-magenta-solid: color-mix(in srgb, var(--omarchy-magenta) 80%, var(--omarchy-foreground));
+}
+
+/* Native scrollbars, form controls and <select> popups follow the desktop
+   mode, not Chrome's, so a light Omarchy theme under a dark browser still
+   gets light widgets. */
+:root[data-omarchy-mode="dark"] { color-scheme: dark; }
+:root[data-omarchy-mode="light"] { color-scheme: light; }
+
+:root {
+  scrollbar-color: var(--oma-line-strong) var(--omarchy-background);
+}
+
+/* ------------------------------------------------------------------ */
+/* Core semantics — surfaces, content, borders                         */
+/* ------------------------------------------------------------------ */
+
+:root,
+:host {
+  --bgColor-default: var(--oma-0) !important;
+  --bgColor-muted: var(--oma-1) !important;
+  --bgColor-inset: var(--oma-inset) !important;
+  --bgColor-black: var(--oma-inset) !important;
+  --bgColor-emphasis: var(--oma-4) !important;
+  --bgColor-disabled: var(--oma-2) !important;
+  --bgColor-inverse: var(--omarchy-foreground) !important;
+  --bgColor-white: var(--oma-0) !important;
+  --bgColor-neutral-emphasis: var(--omarchy-light-foreground) !important;
+  --bgColor-neutral-muted: var(--oma-fg-t20) !important;
+
+  --bgColor-accent-emphasis: var(--oma-accent-solid) !important;
+  --bgColor-accent-muted: var(--oma-accent-t15) !important;
+  --bgColor-success-emphasis: var(--oma-green-solid) !important;
+  --bgColor-success-muted: var(--oma-green-t15) !important;
+  --bgColor-danger-emphasis: var(--oma-red-solid) !important;
+  --bgColor-danger-muted: var(--oma-red-t15) !important;
+  --bgColor-attention-emphasis: var(--oma-yellow-solid) !important;
+  --bgColor-attention-muted: var(--oma-yellow-t15) !important;
+  --bgColor-severe-emphasis: var(--oma-orange-solid) !important;
+  --bgColor-severe-muted: var(--oma-orange-t15) !important;
+  --bgColor-done-emphasis: var(--oma-purple-solid) !important;
+  --bgColor-done-muted: var(--oma-purple-t15) !important;
+  --bgColor-sponsors-emphasis: var(--oma-magenta-solid) !important;
+  --bgColor-sponsors-muted: var(--oma-magenta-t15) !important;
+
+  --fgColor-default: var(--oma-text) !important;
+  --fgColor-muted: var(--oma-text-muted) !important;
+  --fgColor-neutral: var(--oma-text-muted) !important;
+  --fgColor-disabled: var(--oma-text-faint) !important;
+  /* Text drawn on an emphasis fill. The background reads against every
+     palette hue in both modes; white does not. */
+  --fgColor-onEmphasis: var(--omarchy-background) !important;
+  --fgColor-onInverse: var(--omarchy-background) !important;
+  --fgColor-white: var(--omarchy-background) !important;
+  --fgColor-black: var(--omarchy-background) !important;
+
+  --fgColor-accent: var(--omarchy-accent) !important;
+  --fgColor-success: var(--omarchy-green) !important;
+  --fgColor-danger: var(--omarchy-red) !important;
+  --fgColor-attention: var(--omarchy-yellow) !important;
+  --fgColor-severe: var(--omarchy-orange) !important;
+  --fgColor-done: var(--omarchy-purple) !important;
+  --fgColor-sponsors: var(--omarchy-magenta) !important;
+
+  --borderColor-default: var(--oma-line) !important;
+  --borderColor-muted: var(--oma-line-weak) !important;
+  --borderColor-emphasis: var(--oma-line-strong) !important;
+  --borderColor-disabled: var(--oma-fg-t10) !important;
+  --borderColor-translucent: color-mix(in srgb, var(--omarchy-foreground) 15%, transparent) !important;
+
+  --borderColor-accent-emphasis: var(--oma-accent-solid) !important;
+  --borderColor-accent-muted: var(--oma-accent-t40) !important;
+  --borderColor-success-emphasis: var(--oma-green-solid) !important;
+  --borderColor-success-muted: var(--oma-green-t40) !important;
+  --borderColor-danger-emphasis: var(--oma-red-solid) !important;
+  --borderColor-danger-muted: var(--oma-red-t40) !important;
+  --borderColor-attention-emphasis: var(--oma-yellow-solid) !important;
+  --borderColor-attention-muted: var(--oma-yellow-t40) !important;
+  --borderColor-severe-emphasis: var(--oma-orange-solid) !important;
+  --borderColor-severe-muted: var(--oma-orange-t40) !important;
+  --borderColor-done-emphasis: var(--oma-purple-solid) !important;
+  --borderColor-done-muted: var(--oma-purple-t40) !important;
+  --borderColor-sponsors-emphasis: var(--oma-magenta-solid) !important;
+  --borderColor-sponsors-muted: var(--oma-magenta-t40) !important;
+}
+
+/* ------------------------------------------------------------------ */
+/* Controls and buttons                                                */
+/* ------------------------------------------------------------------ */
+
+:root,
+:host {
+  --control-bgColor-rest: var(--oma-2) !important;
+  --control-bgColor-hover: var(--oma-3) !important;
+  --control-bgColor-active: var(--oma-4) !important;
+  --control-borderColor-selected: var(--oma-text-strong) !important;
+  --control-transparent-bgColor-hover: var(--oma-fg-t20) !important;
+  --control-transparent-bgColor-active: var(--oma-fg-t25) !important;
+  --control-transparent-bgColor-selected: var(--oma-fg-t20) !important;
+
+  /* Checkboxes, radios, switches. Hover/active intensify by pulling the
+     accent toward the foreground, which brightens in dark and deepens in
+     light. */
+  --control-checked-bgColor-hover: var(--oma-accent-solid-hover) !important;
+  --control-checked-bgColor-active: var(--oma-accent-solid-active) !important;
+  --control-checked-fgColor-disabled: var(--omarchy-background) !important;
+  --control-danger-bgColor-active: var(--oma-red-t40) !important;
+  --control-danger-fgColor-hover: var(--omarchy-bright-red) !important;
+
+  --controlTrack-bgColor-rest: var(--oma-inset) !important;
+  --controlTrack-bgColor-hover: var(--oma-3) !important;
+  --controlTrack-bgColor-active: var(--oma-4) !important;
+  --controlKnob-bgColor-rest: var(--oma-3) !important;
+  --controlKnob-bgColor-checked: var(--oma-text-strong) !important;
+
+  --button-inactive-bgColor: var(--oma-3) !important;
+  --button-inactive-fgColor: var(--oma-text-muted) !important;
+  --button-star-iconColor: var(--omarchy-yellow) !important;
+
+  --button-primary-bgColor-hover: var(--oma-green-solid-hover) !important;
+  --button-primary-bgColor-active: var(--oma-green-solid-active) !important;
+  --button-primary-bgColor-disabled: color-mix(in srgb, var(--omarchy-green) 40%, var(--omarchy-background)) !important;
+  --button-primary-borderColor-disabled: color-mix(in srgb, var(--omarchy-green) 40%, var(--omarchy-background)) !important;
+  --button-primary-fgColor-disabled: color-mix(in srgb, var(--omarchy-background) 60%, transparent) !important;
+
+  --button-danger-bgColor-hover: var(--oma-red-solid-hover) !important;
+  --button-danger-fgColor-rest: var(--omarchy-red) !important;
+  --button-danger-fgColor-hover: var(--omarchy-background) !important;
+  --button-danger-fgColor-active: var(--omarchy-background) !important;
+  --button-danger-iconColor-hover: var(--omarchy-background) !important;
+  --button-danger-fgColor-disabled: color-mix(in srgb, var(--omarchy-red) 50%, transparent) !important;
+
+  --button-outline-bgColor-rest: var(--oma-2) !important;
+  --button-outline-bgColor-active: var(--oma-accent-solid-active) !important;
+  --button-outline-fgColor-rest: var(--omarchy-accent) !important;
+  --button-outline-fgColor-hover: color-mix(in srgb, var(--omarchy-accent) 85%, var(--omarchy-foreground)) !important;
+  --button-outline-fgColor-active: var(--omarchy-background) !important;
+  --button-outline-fgColor-disabled: color-mix(in srgb, var(--omarchy-accent) 50%, transparent) !important;
+
+  --buttonCounter-default-bgColor-rest: var(--oma-4) !important;
+  --buttonCounter-danger-bgColor-rest: color-mix(in srgb, var(--omarchy-red) 20%, transparent) !important;
+  --buttonCounter-danger-bgColor-hover: color-mix(in srgb, var(--omarchy-background) 20%, transparent) !important;
+  --buttonCounter-danger-bgColor-disabled: color-mix(in srgb, var(--omarchy-red) 6%, transparent) !important;
+  --buttonCounter-danger-fgColor-hover: var(--omarchy-background) !important;
+  --buttonCounter-danger-fgColor-disabled: color-mix(in srgb, var(--omarchy-red) 50%, transparent) !important;
+  --buttonCounter-outline-bgColor-rest: color-mix(in srgb, var(--omarchy-accent) 20%, transparent) !important;
+  --buttonCounter-outline-bgColor-hover: color-mix(in srgb, var(--omarchy-accent) 28%, transparent) !important;
+  --buttonCounter-outline-bgColor-disabled: color-mix(in srgb, var(--omarchy-accent) 6%, transparent) !important;
+  --buttonCounter-outline-fgColor-rest: var(--omarchy-accent) !important;
+  --buttonCounter-outline-fgColor-hover: color-mix(in srgb, var(--omarchy-accent) 85%, var(--omarchy-foreground)) !important;
+  --buttonCounter-outline-fgColor-disabled: color-mix(in srgb, var(--omarchy-accent) 50%, transparent) !important;
+  --buttonCounter-primary-bgColor-rest: color-mix(in srgb, var(--omarchy-green) 20%, transparent) !important;
+
+  --buttonKeybindingHint-default-bgColor-rest: var(--oma-3) !important;
+  --buttonKeybindingHint-inactive-bgColor: var(--oma-3) !important;
+  --buttonKeybindingHint-danger-bgColor-hover: color-mix(in srgb, var(--omarchy-darker-background) 20%, transparent) !important;
+  --buttonKeybindingHint-danger-bgColor-active: color-mix(in srgb, var(--omarchy-darker-background) 40%, transparent) !important;
+  --buttonKeybindingHint-danger-borderColor-hover: var(--oma-fg-t10) !important;
+  --buttonKeybindingHint-primary-bgColor-disabled: color-mix(in srgb, var(--omarchy-green) 10%, transparent) !important;
+  --buttonKeybindingHint-primary-borderColor-rest: color-mix(in srgb, var(--omarchy-green) 20%, transparent) !important;
+}
+
+/* ------------------------------------------------------------------ */
+/* Chrome — header, overlays, nav, misc components                     */
+/* ------------------------------------------------------------------ */
+
+:root,
+:host {
+  --header-bgColor: var(--oma-1) !important;
+  --header-borderColor-divider: var(--oma-line-strong) !important;
+  --header-fgColor-default: var(--oma-text-muted) !important;
+  --header-fgColor-logo: var(--oma-text-strong) !important;
+  --headerSearch-bgColor: var(--oma-0) !important;
+  --headerSearch-borderColor: var(--oma-line) !important;
+
+  --overlay-bgColor: var(--oma-1) !important;
+  --overlay-backdrop-bgColor: color-mix(in srgb, var(--omarchy-darker-background) 60%, transparent) !important;
+  --menu-bgColor-active: var(--oma-3) !important;
+  --selectMenu-bgColor-active: color-mix(in srgb, var(--omarchy-accent) 30%, var(--omarchy-background)) !important;
+  --sideNav-bgColor-selected: var(--oma-2) !important;
+  --timelineBadge-bgColor: var(--oma-2) !important;
+  --skeletonLoader-bgColor: var(--oma-fg-t20) !important;
+  --highlight-neutral-bgColor: var(--oma-yellow-t40) !important;
+  --selection-bgColor: var(--omarchy-selection-background) !important;
+
+  /* The PR/issue tab underline — GitHub's is a fixed coral. */
+  --underlineNav-borderColor-active: var(--oma-orange-solid) !important;
+
+  --avatar-bgColor: var(--oma-fg-t10) !important;
+  --avatar-shadow: 0 0 0 2px var(--omarchy-background) !important;
+  --avatarStack-fade-bgColor-default: var(--oma-4) !important;
+  --avatarStack-fade-bgColor-muted: var(--oma-3) !important;
+
+  --reactionButton-selected-bgColor-rest: color-mix(in srgb, var(--omarchy-accent) 20%, transparent) !important;
+  --reactionButton-selected-bgColor-hover: color-mix(in srgb, var(--omarchy-accent) 35%, transparent) !important;
+  --reactionButton-selected-fgColor-hover: var(--omarchy-bright-blue) !important;
+
+  /* Page-specific leftovers that never got folded into the semantic set. */
+  --color-notifications-row-bg: var(--oma-0) !important;
+  --color-notifications-row-read-bg: var(--oma-1) !important;
+  --color-bg-discussions-row-emoji-box: var(--oma-2) !important;
+  --color-project-header-bg: var(--oma-inset) !important;
+  --color-project-sidebar-bg: var(--oma-1) !important;
+  --color-workflow-card-bg: var(--oma-1) !important;
+  --color-user-mention-fg: var(--oma-text-strong) !important;
+  --color-text-white: var(--omarchy-background) !important;
+
+  /* Floating menus and dialogs: the 1px ring does the separating work, the
+     cast is kept soft so a light palette does not get a black halo. */
+  --shadow-floating-small: 0 0 0 1px var(--oma-line), 0 6px 12px -3px var(--oma-shadow-cast), 0 6px 18px 0 var(--oma-shadow-cast) !important;
+  --shadow-floating-medium: 0 0 0 1px var(--oma-line), 0 8px 16px -4px var(--oma-shadow-cast), 0 24px 48px -12px var(--oma-shadow-cast) !important;
+  --shadow-floating-large: 0 0 0 1px var(--oma-line), 0 24px 48px 0 var(--oma-shadow-cast) !important;
+  --shadow-floating-xlarge: 0 0 0 1px var(--oma-line), 0 32px 64px 0 var(--oma-shadow-cast) !important;
+  --shadow-resting-small: 0 1px 1px 0 var(--oma-shadow-cast), 0 1px 3px 0 var(--oma-shadow-cast) !important;
+  --shadow-resting-medium: 0 1px 1px 0 var(--oma-shadow-cast), 0 3px 6px 0 var(--oma-shadow-cast) !important;
+  --shadow-resting-xsmall: 0 1px 1px 0 var(--oma-shadow-cast) !important;
+  --shadow-inset: inset 0 1px 0 0 var(--oma-fg-t10) !important;
+
+  --contribution-default-bgColor-0: var(--oma-1) !important;
+  --contribution-default-bgColor-1: color-mix(in srgb, var(--omarchy-green) 25%, var(--omarchy-background)) !important;
+  --contribution-default-bgColor-2: color-mix(in srgb, var(--omarchy-green) 50%, var(--omarchy-background)) !important;
+  --contribution-default-bgColor-3: color-mix(in srgb, var(--omarchy-green) 75%, var(--omarchy-background)) !important;
+  --contribution-default-bgColor-4: var(--omarchy-green) !important;
+  --contribution-default-borderColor-0: var(--oma-fg-t10) !important;
+}
+
+/* ------------------------------------------------------------------ */
+/* Diffs                                                               */
+/* ------------------------------------------------------------------ */
+
+:root,
+:host {
+  /* These default to the `*-muted` semantic tints, which are 15% alpha — enough
+     over a dark canvas, invisible over a light one (verified against
+     flexoki-light: the added side read as plain paper). Diff bands cover whole
+     rows, so they are mixed into the background as opaque colors at a strength
+     that survives both polarities; only the word-level highlights stay
+     translucent, because those have to layer over the row band. */
+  --diffBlob-additionLine-bgColor: color-mix(in srgb, var(--omarchy-green) 22%, var(--omarchy-background)) !important;
+  --diffBlob-deletionLine-bgColor: color-mix(in srgb, var(--omarchy-red) 20%, var(--omarchy-background)) !important;
+  --diffBlob-additionNum-bgColor: color-mix(in srgb, var(--omarchy-green) 38%, var(--omarchy-background)) !important;
+  --diffBlob-deletionNum-bgColor: color-mix(in srgb, var(--omarchy-red) 36%, var(--omarchy-background)) !important;
+  --diffBlob-additionWord-bgColor: var(--oma-green-t40) !important;
+  --diffBlob-deletionWord-bgColor: var(--oma-red-t40) !important;
+  --diffBlob-hunkLine-bgColor: color-mix(in srgb, var(--omarchy-accent) 14%, var(--omarchy-background)) !important;
+  --diffBlob-hunkNum-bgColor-rest: color-mix(in srgb, var(--omarchy-accent) 30%, var(--omarchy-background)) !important;
+}
+
+/* The selected-line highlight is composited, so the blend mode has to follow
+   the Omarchy polarity rather than GitHub's own light/dark setting. */
+:root[data-omarchy-mode="dark"] { --color-diff-blob-selected-line-highlight-mix-blend-mode: screen !important; }
+:root[data-omarchy-mode="light"] { --color-diff-blob-selected-line-highlight-mix-blend-mode: multiply !important; }
+
+/* ------------------------------------------------------------------ */
+/* Code: terminal colors, terminal font                                */
+/* ------------------------------------------------------------------ */
+
+:root,
+:host {
+  /* Match the desktop terminal so a diff reads the way the same file does in
+     a shell. Primer routes every code surface through this one token. */
+  --fontStack-monospace: "JetBrainsMono Nerd Font", "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace !important;
+
+  --prettylights-syntax-comment: color-mix(in srgb, var(--omarchy-foreground) 55%, var(--omarchy-background)) !important;
+  --prettylights-syntax-constant: var(--omarchy-blue) !important;
+  --prettylights-syntax-constantOtherReferenceLink: var(--omarchy-cyan) !important;
+  --prettylights-syntax-entity: var(--omarchy-purple) !important;
+  --prettylights-syntax-entityTag: var(--omarchy-green) !important;
+  --prettylights-syntax-keyword: var(--omarchy-red) !important;
+  --prettylights-syntax-string: var(--omarchy-cyan) !important;
+  --prettylights-syntax-stringRegexp: var(--omarchy-green) !important;
+  --prettylights-syntax-variable: var(--omarchy-orange) !important;
+  --prettylights-syntax-storageModifierImport: var(--omarchy-bright-foreground) !important;
+  --prettylights-syntax-metaDiffRange: var(--omarchy-purple) !important;
+  --prettylights-syntax-bracketHighlighterAngle: var(--oma-text-muted) !important;
+  --prettylights-syntax-bracketHighlighterUnmatched: var(--omarchy-red) !important;
+  --prettylights-syntax-sublimeLinterGutterMark: var(--oma-line) !important;
+  --prettylights-syntax-carriageReturn-bg: var(--omarchy-red) !important;
+  --prettylights-syntax-carriageReturn-text: var(--omarchy-background) !important;
+
+  --prettylights-syntax-markup-bold: var(--omarchy-bright-foreground) !important;
+  --prettylights-syntax-markup-italic: var(--omarchy-bright-foreground) !important;
+  --prettylights-syntax-markup-heading: var(--omarchy-accent) !important;
+  --prettylights-syntax-markup-list: var(--omarchy-yellow) !important;
+  --prettylights-syntax-markup-inserted-text: var(--omarchy-bright-green) !important;
+  --prettylights-syntax-markup-inserted-bg: color-mix(in srgb, var(--omarchy-green) 22%, var(--omarchy-background)) !important;
+  --prettylights-syntax-markup-deleted-text: var(--omarchy-bright-red) !important;
+  --prettylights-syntax-markup-deleted-bg: color-mix(in srgb, var(--omarchy-red) 22%, var(--omarchy-background)) !important;
+  --prettylights-syntax-markup-changed-text: var(--omarchy-bright-yellow) !important;
+  --prettylights-syntax-markup-changed-bg: color-mix(in srgb, var(--omarchy-yellow) 22%, var(--omarchy-background)) !important;
+  --prettylights-syntax-markup-ignored-text: var(--omarchy-bright-foreground) !important;
+  --prettylights-syntax-markup-ignored-bg: color-mix(in srgb, var(--omarchy-accent) 30%, var(--omarchy-background)) !important;
+
+  --codeMirror-syntax-fgColor-comment: color-mix(in srgb, var(--omarchy-foreground) 55%, var(--omarchy-background)) !important;
+  --codeMirror-syntax-fgColor-constant: var(--omarchy-blue) !important;
+  --codeMirror-syntax-fgColor-entity: var(--omarchy-purple) !important;
+  --codeMirror-syntax-fgColor-keyword: var(--omarchy-red) !important;
+  --codeMirror-syntax-fgColor-storage: var(--omarchy-red) !important;
+  --codeMirror-syntax-fgColor-string: var(--omarchy-cyan) !important;
+  --codeMirror-syntax-fgColor-support: var(--omarchy-blue) !important;
+  --codeMirror-syntax-fgColor-variable: var(--omarchy-orange) !important;
+
+  /* Actions logs and any other terminal emulator on the site. */
+  --ansi-black: var(--omarchy-color0) !important;
+  --ansi-blackBright: var(--omarchy-color8) !important;
+  --ansi-red: var(--omarchy-red) !important;
+  --ansi-redBright: var(--omarchy-bright-red) !important;
+  --ansi-green: var(--omarchy-green) !important;
+  --ansi-greenBright: var(--omarchy-bright-green) !important;
+  --ansi-yellow: var(--omarchy-yellow) !important;
+  --ansi-yellowBright: var(--omarchy-bright-yellow) !important;
+  --ansi-blue: var(--omarchy-blue) !important;
+  --ansi-blueBright: var(--omarchy-bright-blue) !important;
+  --ansi-magenta: var(--omarchy-magenta) !important;
+  --ansi-magentaBright: var(--omarchy-bright-magenta) !important;
+  --ansi-cyan: var(--omarchy-cyan) !important;
+  --ansi-cyanBright: var(--omarchy-bright-cyan) !important;
+  --ansi-white: var(--omarchy-foreground) !important;
+  --ansi-whiteBright: var(--omarchy-bright-foreground) !important;
+  --ansi-gray: var(--omarchy-color8) !important;
+}

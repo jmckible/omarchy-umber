@@ -42,6 +42,8 @@ Then restart the browser.
 
 > `sites/gmail.css` ships as well, and assumes Gmail's own Appearance setting is **Dark**. It inverts Gmail's white icon sprites on light Omarchy palettes; with Gmail internally set to light, those inversions run the wrong way.
 
+> `sites/github.com.css` points GitHub's syntax highlighting at the palette's ANSI colors and its `--fontStack-monospace` token at `JetBrainsMono Nerd Font`, so a diff reads like the same file in your terminal. That font is Omarchy's default but it is matched by name from the local system — on a machine without it, code falls back to GitHub's own stack and only the colors carry over.
+
 ## Site styles
 
 One CSS file per site in `~/.config/umber/sites/`, scoped by a comment header:
