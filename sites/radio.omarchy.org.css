@@ -1,0 +1,138 @@
+/* @match radio.omarchy.org */
+
+/* Omarchy Radio already speaks Omarchy: its script reads the inline
+   --omarchy-* properties off <html> and derives a whole skin it calls
+   "desktop". Two things make that unreliable, and both are why this file
+   exists.
+
+   1. It reads them once, synchronously, as the page script runs. Umber sets
+      them from an async chrome.storage.local.get, so on a cold cross-document
+      navigation the page frequently wins the race, finds nothing, and falls
+      back to the site's built-in green skin -- which it then persists to
+      localStorage. Reproduced repeatedly by clicking between /playlist/* pages.
+   2. After that first read it only re-derives on an `omarchythemechange`
+      document event, which Umber never fires, so a desktop theme change never
+      reaches the page.
+
+   Custom properties have neither problem: an !important author declaration
+   outranks the site's normal inline style whatever order they land in, and a
+   var() reference re-resolves the instant Umber rewrites the palette. So this
+   file simply re-declares the site's own token block from the palette and lets
+   the site's stylesheet do the rest of the work unchanged.
+
+   It also derives from more than the four keys the site can see. The site has
+   background/accent/selection/foreground and computes the rest; the palette
+   ships 56, including the ink and surface ladders each theme's author tuned. */
+
+:root, :host {
+  /* Surfaces. */
+  --bg: var(--omarchy-background) !important;
+  /* The inset screen. The site mixes toward white in light mode, which erases
+     the panel on a light theme; darker-background is the palette's own
+     furthest-from-ink surface and stays an inset in both modes. */
+  --lcd: var(--omarchy-darker-background) !important;
+  --bd: var(--omarchy-selection) !important;
+  --bdF: color-mix(in srgb, var(--omarchy-selection) 55%, var(--omarchy-background)) !important;
+  --trk: color-mix(in srgb, var(--omarchy-foreground) 22%, var(--omarchy-background)) !important;
+  --rowHov: color-mix(in srgb, var(--omarchy-foreground) 8%, var(--omarchy-background)) !important;
+  --rowOn: color-mix(in srgb, var(--omarchy-accent) 14%, var(--omarchy-background)) !important;
+
+  /* Ink. bright-foreground is the highest-contrast ink in both modes (6.7:1
+     against background in the weakest installed theme); the dimmer tiers mix
+     foreground toward background, which is polarity-correct either way. */
+  --fg: var(--omarchy-bright-foreground) !important;
+  --c2: color-mix(in srgb, var(--omarchy-foreground) 70%, var(--omarchy-background)) !important;
+  --c3: color-mix(in srgb, var(--omarchy-foreground) 45%, var(--omarchy-background)) !important;
+
+  /* Accent. --acFg is the ink on an accent fill: the play button, the
+     songs/podcast segment, the install button. The site picks flat white or a
+     darkened background by accent luminance, which bottoms out at 1.8:1
+     (lumon); the palette's own background pairs with accent by construction and
+     holds >=3.1:1 across every installed theme, better in 22 of 28. */
+  --ac: var(--omarchy-accent) !important;
+  --acFg: var(--omarchy-background) !important;
+  --acHi: color-mix(in srgb, var(--omarchy-accent) 72%, var(--omarchy-bright-foreground)) !important;
+
+  /* Visualiser bricks, bottom to peak. The peak mixes toward bright-foreground,
+     which is the furthest ink from the background in either mode, so it stays
+     the hot end of the bar without a mode switch. The quiet end does need one --
+     see below. */
+  --meter-mid: var(--omarchy-accent) !important;
+  --meter-high: color-mix(in srgb, var(--omarchy-accent) 65%, var(--omarchy-bright-foreground)) !important;
+
+  /* --field-* are read by JS when it paints the #bg canvas, never by CSS;
+     declaring them here would be dead weight. See the #bg rule below. */
+}
+
+/* Everything on the LCD is polarity-sensitive in a way the rest of the deck is
+   not: a segment display is lit-on-dark in a dark theme and dark-on-light in a
+   light one, so "recessed" means sink toward the screen in one and deepen
+   toward the ink in the other. Mixing accent toward the screen in both -- which
+   is what the site does -- leaves the small caps at 1.6:1 on a light panel.
+   --g1 is the label tier (top strip, artist, panel meta), --g2 the quiet one
+   (track duration), --meter-low the base of the visualiser bricks.
+
+   --scan is the scanline overlay, the one shading here that is not a palette
+   colour: it has to sit darker than the screen in both modes, and in dark mode
+   the screen is already the palette's deepest surface, so there is nothing left
+   to mix toward. The site picks between these two by the polarity of whatever
+   skin it derived, which is wrong whenever its detection fell back; key them
+   off the mode Umber stamps instead. */
+:root[data-omarchy-mode="dark"] {
+  --g1: color-mix(in srgb, var(--omarchy-accent) 62%, var(--omarchy-darker-background)) !important;
+  --g2: color-mix(in srgb, var(--omarchy-accent) 42%, var(--omarchy-darker-background)) !important;
+  --meter-low: color-mix(in srgb, var(--omarchy-accent) 45%, var(--omarchy-darker-background)) !important;
+  --scan: repeating-linear-gradient(180deg, rgba(0, 0, 0, .42) 0 2px, transparent 2px 4px) !important;
+}
+:root[data-omarchy-mode="light"] {
+  --g1: color-mix(in srgb, var(--omarchy-accent) 72%, var(--omarchy-foreground)) !important;
+  --g2: color-mix(in srgb, var(--omarchy-accent) 55%, var(--omarchy-darker-background)) !important;
+  --meter-low: color-mix(in srgb, var(--omarchy-accent) 65%, var(--omarchy-darker-background)) !important;
+  --scan: repeating-linear-gradient(180deg, rgba(0, 0, 0, .055) 0 1px, transparent 1px 4px) !important;
+}
+
+/* The marquee and the clock are the display type, set in --ac directly by the
+   site. On a light panel that is bare accent on a near-white screen -- 2.3:1 in
+   rose-pine -- so deepen it toward the ink, the way a real segment display
+   darkens rather than glows. Dark mode wants the glow and is left alone. */
+:root[data-omarchy-mode="light"] .marq-txt,
+:root[data-omarchy-mode="light"] .clock {
+  color: color-mix(in srgb, var(--omarchy-accent) 78%, var(--omarchy-foreground));
+}
+
+/* Podcast chapter lists and timed lyrics share --c3 with placeholders and
+   footnotes, but here it is a list you actually read to pick a row, sitting on
+   the accent-tinted --rowOn band rather than on the background. Lift just this
+   one, so the dim-until-current effect survives without the chapter titles
+   going with it. */
+.is-timed .ly-line {
+  color: color-mix(in srgb, var(--omarchy-foreground) 58%, var(--omarchy-background));
+}
+
+::selection {
+  background: var(--omarchy-selection);
+  color: var(--omarchy-selection-foreground);
+}
+
+/* The pixel field behind the deck is a <canvas>, painted from colours the
+   site's JS cached the last time it derived a skin -- out of reach of CSS, and
+   stale in all three cases that matter: its detection lost the race above, the
+   visitor picked one of the site's own skins, or the desktop theme changed
+   after the page loaded. That last one is the whole point of Umber, and nothing
+   in the DOM distinguishes a stale field from a current one, so this is not
+   conditional. Blending for luminosity keeps the field's shape and animation
+   but takes hue and saturation from the stage underneath, which is
+   --omarchy-background: warm grey on a cream theme, cool grey on a slate one,
+   never the other skin's accent. The opacity holds it to the weight the
+   site-tinted field has, since another skin's luminance range is arbitrary.
+
+   The cost is the accent tint the field has when the site is deriving from the
+   palette itself. If Umber ever dispatches `omarchythemechange` on document
+   after writing the palette -- which is all this site needs to re-derive, canvas
+   included, on both first paint and every theme change -- the field can never
+   go stale and this rule should just be deleted. */
+.stage { isolation: isolate; }
+#bg {
+  mix-blend-mode: luminosity;
+  opacity: .35;
+}
