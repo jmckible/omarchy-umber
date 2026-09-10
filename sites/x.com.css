@@ -28,7 +28,9 @@
    extra values needed for Dim are listed too and this file covers either.
    X's light "Default" background is NOT covered: there #EFF3F4 flips from a
    button fill to a surface and #0F1419 from button ink to body text, and one
-   literal cannot mean both. Keep X on a dark background (Settings > Display).
+   literal cannot mean both. Rather than half-cover it, the whole file is gated
+   off there -- see the @scope below -- so X's light background gets X's own
+   styling, untouched.
 
    Three things worth knowing before editing:
 
@@ -84,8 +86,35 @@
    Gold and grey badges use different classes and keep their own colours, so
    the distinction that badge colour actually carries survives. */
 
-:root,
-:host {
+/* X stamps its own polarity as `data-theme="light|dark"` on <html>, so one
+   @scope around the whole file turns every rule below off on X's light
+   background without editing any of them. X's stock light styling is fine as
+   it is, and this file cannot cover it anyway (see above). The test is
+   `:not([data-theme="light"])` rather than `[data-theme="dark"]` so that
+   anything which is not the light Default background -- Dim and Lights out,
+   both covered here -- keeps the theme even if X ever names them apart.
+
+   @scope rather than a wrapper selector because a scope root adds no
+   specificity to the rules inside it. Nesting all of this under
+   `:root:not([data-theme="light"])` would raise every selector by 0,2,0, which
+   would break the border blanket -- `#react-root *` is a deliberate 1,0,0 that
+   has to lose to X's inline transparent borders and beat its atomic classes.
+
+   `:host` is in the scope-start list because this sheet is also adopted into
+   every open shadow root, where `:root` matches nothing and the scope would
+   otherwise be empty. x.com opens none today; that arm is there so the sheet
+   keeps reaching them if it ever does.
+
+   Inside @scope the implicit prefix is a strict DESCENDANT combinator, so a
+   rule for the scope root itself has to say `:scope` -- an inner `:root` never
+   matches and fails silently. That is why the five blocks below that style
+   <html> read `:scope`; every other rule targets a descendant and is untouched.
+   `:scope` is also what `:root, :host` collapses to here, since in a shadow
+   root the scope root is the host.
+
+   The rules below are deliberately left at their original indentation. */
+@scope (:root:not([data-theme="light"]), :host) {
+:scope {
   --oma-canvas: var(--omarchy-background);
   --oma-elevated: color-mix(in srgb, var(--omarchy-bright-foreground) 10%, var(--omarchy-background));
   --oma-line: color-mix(in srgb, var(--omarchy-bright-foreground) 20%, var(--omarchy-background));
@@ -148,8 +177,7 @@
    `--x-black`, `--x-white` and `--x-overlay-*` are deliberately absent: they
    are literal ink and modal/media scrims, dark in every theme. */
 
-:root,
-:host,
+:scope,
 [data-theme="light"],
 [data-theme="dark"],
 .light-theme,
@@ -255,10 +283,10 @@
    mode, not the `color-scheme: dark` X stamps on <html> -- which is also what
    decides the UA link color, hence the `a` rule at the bottom of this file.
    X writes it as an INLINE style, so these need `!important` to land. */
-:root[data-omarchy-mode="dark"] { color-scheme: dark !important; }
-:root[data-omarchy-mode="light"] { color-scheme: light !important; }
+:scope[data-omarchy-mode="dark"] { color-scheme: dark !important; }
+:scope[data-omarchy-mode="light"] { color-scheme: light !important; }
 
-:root {
+:scope {
   scrollbar-color: var(--oma-g400) var(--omarchy-background);
 }
 
@@ -694,3 +722,5 @@ body {
 #react-root a {
   color: var(--oma-accent);
 }
+
+} /* end @scope -- on X's light background, X's own styling stands */
