@@ -183,6 +183,44 @@ body,
   color: var(--omarchy-foreground) !important;
 }
 
+/* An email that paints its own background is a sheet the sender owns, and the
+   inherited foreground above lands on it -- 20 of 79 visible runs on one
+   marketing sheet measured under 3:1, the palette's light ink on white paper.
+   Re-seed the inherited ink at every authored-background boundary with the
+   dark end of the palette, deliberately WITHOUT !important so any color the
+   sender did declare still wins on the element declaring it. Text outside such
+   a sheet keeps the palette foreground, which is what keeps plain-text mail
+   readable when Gmail's internal Dark ink meets a light Omarchy palette.
+   Caveat: a sender's own *dark* sheet gets dark ink (19 of 378 runs across 5
+   sampled messages); CSS cannot read the plate's color to do better. */
+.a3s {
+  --u-sheet-ink: var(--omarchy-background);
+  --u-link: var(--omarchy-accent);
+}
+
+:root[data-omarchy-mode="light"] .a3s {
+  --u-sheet-ink: var(--omarchy-foreground);
+}
+
+/* Both tokens are re-seeded together at the boundary, and the boundary test
+   must stay a descendant match. An ancestor test (`:not([style*="background"]
+   a)`) silently matches everything, because content.js stamps the palette onto
+   <html> as inline custom properties and `--omarchy-background:` contains the
+   substring -- so every node in the page is "inside a sheet". */
+.a3s :is([bgcolor], [style*="background"]) {
+  color: var(--u-sheet-ink);
+  --u-link: color-mix(in srgb, var(--omarchy-accent) 55%, var(--u-sheet-ink));
+}
+
+/* Gmail paints body links #1155cc via `.ii a[href]`, a color chosen for white
+   paper and left at 1.9 against the themed surface. Umber's sheet sorts after
+   Gmail's, so matching that specificity wins the tie without !important -- and
+   a sender's own inline link color still beats us. Inside a sender's sheet the
+   accent is blended toward the sheet ink so it stays legible on white paper. */
+.a3s a[href] {
+  color: var(--u-link);
+}
+
 .adn {
   background-color: transparent !important;
 }
@@ -246,13 +284,18 @@ body,
   color: var(--omarchy-accent) !important;
 }
 
-/* Settings address chips ("Send mail as", forwarding, delegates): .aiL is the
-   chip field, and the address inside keeps Gmail's own rgb(32,33,36) ink over
-   the themed surface -- measured 1.34 against it, i.e. invisible. The depth is
-   deliberately not pinned: `.aiL > div > div > div` reads like the right chain
-   but bottoms out on a span, so it matches nothing at all (0 hits on inbox,
-   search and settings, verified 2026-08-25). */
-.aiL :is(div, span) {
+/* Settings address rows ("Send mail as", forwarding, delegates) keep Gmail's
+   own rgb(32,33,36) ink over the themed surface -- measured 1.22 against it,
+   i.e. invisible. The anchor here was `.aiL`, which was wrong in both
+   directions (2026-09-13): it matched nothing on any settings tab, and Gmail
+   also puts aiL on the message body itself (`.a3s aiL`), so the !important was
+   repainting every div and span inside every email and beating the colors the
+   sender chose -- 15 of 15 authored inline colors overridden in one sampled
+   message. `.rc` is the row that actually holds these addresses: 7 on the
+   accounts tab, 3 on forwarding, and 0 anywhere in the inbox, a conversation,
+   or a message body. */
+.rc,
+.rc :is(div, span) {
   color: var(--omarchy-foreground) !important;
 }
 
