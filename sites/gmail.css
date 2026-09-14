@@ -221,6 +221,33 @@ body,
   color: var(--u-link);
 }
 
+/* The other half of that story: a sender who paints no plate at all. Their ink
+   was authored for Gmail's white paper, which Umber replaced with the palette
+   background, so it lands on the wrong surface -- 162 of 180 visible runs in
+   one Substack issue measured under 3:1, nearly all inherited from a single
+   `color:#363737` wrapper. Text that declares no color already gets the palette
+   ink from the .a3s rule above; this extends that to text that declares its
+   own, which an inline style would otherwise win. Inside a plate the sender
+   does paint, the authored ink suits the paper it sits on and is left alone.
+   The exclusion must stay anchored under .a3s: a bare `[style*="background"]`
+   ancestor test matches <html> itself (content.js stamps `--omarchy-background:`
+   there), so an unanchored :not() excludes the whole document -- measured, it
+   matched 0 elements. `[style*="color"]` also catches `border-color` and
+   friends, which is harmless: those subtrees were inheriting palette ink
+   anyway. */
+.a3s :is([style*="color"], font[color]):not([bgcolor], [style*="background"], .a3s :is([bgcolor], [style*="background"]) *) {
+  color: var(--omarchy-foreground) !important;
+}
+
+/* Same boundary for links, so they keep the link color instead of the body ink.
+   This does override a sender's own inline link color, which the rule above
+   deliberately avoids inside a plate -- but outside one it is authored for
+   paper that is no longer there: 6 of 29 links in that issue were that same
+   #363737, at 1.17. */
+.a3s a[href]:is([style*="color"], font[color]):not([bgcolor], [style*="background"], .a3s :is([bgcolor], [style*="background"]) *) {
+  color: var(--u-link) !important;
+}
+
 .adn {
   background-color: transparent !important;
 }
