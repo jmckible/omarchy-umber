@@ -45,6 +45,7 @@
 #
 export PATH="/usr/local/bin:/usr/bin:$HOME/.local/bin:$HOME/.local/share/mise/shims:$PATH"
 
+HOST_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
 CONFIG_DIR="$HOME/.config/umber"
 SITES_DIR="$CONFIG_DIR/sites"
 STATE_DIR="$HOME/.local/state/omarchy/current"
@@ -69,6 +70,8 @@ MAX_CENSUS_BYTES=262144
 MAX_SHOT_BYTES=8388608      # decoded screenshot
 MAX_SHOT_B64=11534336       # its base64 envelope
 MAX_PALETTE_BYTES=16384     # omarchy-theme-color --all is ~60 short lines
+MAX_PROMPT_BYTES=16384      # agent prompt handed to a herdr pane: fixed text
+                            # plus one URL
 
 NAME_RE='^[A-Za-z0-9][A-Za-z0-9._-]*$'
 HOST_RE='^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)*$'
@@ -399,9 +402,90 @@ handle_append() {
   fi
 }
 
-# Launch the user's default agent in a floating terminal, pointed at the site's
-# stylesheet with fresh page context on disk. The terminal is the progress UI;
-# the live styles push is the preview.
+# --- agent launch -----------------------------------------------------------
+# herdr ships with Omarchy, but omarchy-agent only knows the floating terminal.
+# Omarchy never starts a herdr server on its own, so a running one means the
+# user works in herdr, and the session opens there as a tab in an "umber"
+# workspace. Anything short of that (no server, a failed call) falls through to
+# the stock launch, so the button never does nothing.
+HERDR_WORKSPACE=umber
+
+# launch_in_herdr SITE CTX PROMPT — 0 once the agent is handed to herdr.
+#
+# herdr starts a process only by typing into a pane's interactive shell, so the
+# typed line is parsed by whatever shell that is. The line therefore carries
+# nothing the page shaped. The prompt goes to a file in the run-private context
+# dir, and the line is a fixed helper plus that path. It is refused outright
+# unless both are plain path characters: a repo path with a space falls back to
+# stock rather than being quoted for a shell this script cannot see.
+launch_in_herdr() {
+  local site=$1 ctx=$2 prompt=$3 line ws created tab pane
+  command -v herdr >/dev/null || return 1
+  [[ $(timeout 3s herdr status server --json 2>/dev/null | jq -r '.running' 2>/dev/null) == true ]] ||
+    return 1
+
+  line="exec $HOST_DIR/umber-agent-run $ctx/prompt"
+  [[ $line =~ ^exec\ /[A-Za-z0-9._/-]+\ /[A-Za-z0-9._/-]+$ ]] || return 1
+  printf '%s' "$prompt" | write_bounded "$ctx/prompt" create "$MAX_PROMPT_BYTES" || return 1
+
+  ws=$(timeout 3s herdr workspace list 2>/dev/null | jq -r --arg l "$HERDR_WORKSPACE" \
+    'first(.result.workspaces[] | select(.label == $l) | .workspace_id) // empty' 2>/dev/null)
+  if [[ -n $ws ]]; then
+    created=$(timeout 3s herdr tab create --workspace "$ws" --label "$site" \
+      --cwd "$CONFIG_DIR" --focus 2>/dev/null)
+  else
+    created=$(timeout 3s herdr workspace create --label "$HERDR_WORKSPACE" \
+      --cwd "$CONFIG_DIR" --focus 2>/dev/null)
+  fi
+  tab=$(jq -r '.result.tab.tab_id // empty' <<<"$created" 2>/dev/null)
+  pane=$(jq -r '.result.root_pane.pane_id // empty' <<<"$created" 2>/dev/null)
+  [[ -n $tab && -n $pane ]] || return 1
+  # A new workspace's first tab is numbered, not named.
+  [[ -n $ws ]] || timeout 3s herdr tab rename "$tab" "$site" >/dev/null 2>&1
+
+  if ! timeout 3s herdr pane run "$pane" "$line" >/dev/null 2>&1; then
+    if [[ -n $ws ]]; then
+      timeout 3s herdr tab close "$tab" >/dev/null 2>&1
+    else
+      timeout 3s herdr workspace close "$(jq -r '.result.workspace.workspace_id' <<<"$created")" >/dev/null 2>&1
+    fi
+    return 1
+  fi
+  raise_herdr
+  return 0
+}
+
+# --focus moves herdr's own focus, not the desktop's. Raise the terminal a herdr
+# client runs in, found by walking up from each client process to the pid of a
+# Hyprland window. With none attached, open one; it lands on the tab just
+# focused. A client started with arguments (--session, --remote, session attach)
+# is attached to some other server, so only a bare `herdr` counts.
+raise_herdr() {
+  [[ -n ${HYPRLAND_INSTANCE_SIGNATURE:-} ]] || return 0
+  local windows pid depth addr argv
+  windows=$(timeout 3s hyprctl clients -j 2>/dev/null) || windows='[]'
+  for pid in $(pgrep -x herdr); do
+    mapfile -d '' argv <"/proc/$pid/cmdline" 2>/dev/null || continue
+    ((${#argv[@]} == 1)) || continue
+    for ((depth = 0; depth < 6; depth++)); do
+      addr=$(jq -r --argjson p "$pid" 'first(.[] | select(.pid == $p) | .address) // empty' \
+        <<<"$windows" 2>/dev/null)
+      if [[ -n $addr ]]; then
+        hyprctl dispatch "hl.dsp.focus({ window = \"address:$addr\" })" >/dev/null 2>&1 ||
+          hyprctl dispatch focuswindow "address:$addr" >/dev/null 2>&1
+        return 0
+      fi
+      pid=$(ps -o ppid= -p "$pid" 2>/dev/null)
+      pid=${pid//[[:space:]]/}
+      [[ $pid =~ ^[0-9]+$ ]] && ((pid > 1)) || break
+    done
+  done
+  timeout 15s setsid -f omarchy-launch-terminal-herdr </dev/null >/dev/null 2>&1
+}
+
+# Launch the user's default agent — in herdr when it is running, a floating
+# terminal otherwise — pointed at the site's stylesheet with fresh page context
+# on disk. The terminal is the progress UI; the live styles push is the preview.
 #
 # Everything the page contributed — its URL, the census, the screenshot — is
 # attacker-shaped text on its way to an agent that can write files and run
@@ -449,6 +533,10 @@ handle_agent() {
     prompt="Read $CONFIG_DIR/AGENT.md first and follow it. $SITES_DIR/$site.css already themes $url — read it before anything else and treat it as verified against the live DOM: its selectors and comments record traps found empirically. Ask the user what they want changed and wait for their answer before editing anything. Then make the smallest change that addresses it: keep the @match header and the existing comments, leave rules unrelated to the ask alone, and do not restructure or reformat what you were not asked about. $ctx_note"
   else
     prompt="Read $CONFIG_DIR/AGENT.md first and follow it. Then create the Umber stylesheet for $url at $SITES_DIR/$site.css — nothing themes this page yet. $ctx_note"
+  fi
+  if launch_in_herdr "$site" "$ctx" "$prompt"; then
+    send_status "$site" done "agent launched in herdr"
+    return 0
   fi
   timeout 15s setsid -f omarchy-agent-prompt "$prompt" </dev/null >/dev/null 2>&1
   send_status "$site" done "agent terminal launched"

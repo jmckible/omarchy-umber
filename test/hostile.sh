@@ -14,12 +14,22 @@ FAIL=0
 ok() { printf '  \033[32mok\033[0m   %s\n' "$1"; PASS=$((PASS + 1)); }
 no() { printf '  \033[31mFAIL\033[0m %s\n' "$1"; FAIL=$((FAIL + 1)); }
 
+# sandboxed CMD... — run CMD with the sandbox as HOME. herdr and the compositor
+# are reached through inherited variables, not HOME, so those are pointed at
+# the sandbox or dropped: a fixture must never open a tab in the real herdr
+# session or raise a window on the real desktop.
+sandboxed() {
+  env -u HERDR_ENV -u HERDR_PANE_ID -u HERDR_TAB_ID -u HERDR_WORKSPACE_ID \
+    -u HYPRLAND_INSTANCE_SIGNATURE -u WAYLAND_DISPLAY \
+    HOME="$SANDBOX" XDG_RUNTIME_DIR="$SANDBOX/run" XDG_CONFIG_HOME="$SANDBOX/.config" \
+    HERDR_SOCKET_PATH="$SANDBOX/herdr.sock" "$@"
+}
+
 # run DEADLINE MESSAGE... — drive the host in the sandbox HOME, messages on stdout
 run() {
   local deadline=$1
   shift
-  HOME="$SANDBOX" XDG_RUNTIME_DIR="$SANDBOX/run" \
-    python3 "$REPO/test/drive.py" "$HOST" "$deadline" "$@"
+  sandboxed python3 "$REPO/test/drive.py" "$HOST" "$deadline" "$@"
 }
 
 setup() {
@@ -54,7 +64,7 @@ teardown
 
 setup
 mkfifo "$SITES/pipe.css"
-out=$(timeout 25s bash -c "$(declare -f run); SANDBOX='$SANDBOX' REPO='$REPO' HOST='$HOST' run 0.4" 2>/dev/null)
+out=$(timeout 25s bash -c "$(declare -f sandboxed run); SANDBOX='$SANDBOX' REPO='$REPO' HOST='$HOST' run 0.4" 2>/dev/null)
 rc=$?
 if ((rc == 124)); then
   no "FIFO stylesheet: the host parked on the open"
@@ -220,10 +230,63 @@ else
 fi
 teardown
 
+# --- agent launch: herdr -----------------------------------------------------
+# With a herdr server running, the host types a command into a pane's shell.
+# A page URL that is also a command substitution has to reach the agent as text
+# and never run. The fixture runs its own herdr server in the sandbox. Its panes
+# find a stub omarchy-agent-prompt that records argv. The default agent is a
+# name nothing installs, so a fall-through to the stock launch fails there
+# instead of opening a real agent.
+
+if command -v herdr >/dev/null 2>&1; then
+  setup
+  mkdir -p "$SANDBOX/stub" "$SANDBOX/.config/omarchy/defaults"
+  printf 'umber-no-such-agent\n' >"$SANDBOX/.config/omarchy/defaults/agent"
+  cat >"$SANDBOX/stub/omarchy-agent-prompt" <<'SH'
+#!/bin/bash
+printf '%s\0' "$@" >"$HOME/argv"
+SH
+  chmod +x "$SANDBOX/stub/omarchy-agent-prompt"
+  PATH="$SANDBOX/stub:$PATH" sandboxed setsid -f herdr server </dev/null >/dev/null 2>&1
+  for _ in {1..50}; do
+    [[ $(sandboxed herdr status server --json 2>/dev/null | jq -r '.running') == true ]] && break
+    sleep 0.1
+  done
+  if [[ $(sandboxed herdr status server --json 2>/dev/null | jq -r '.running') != true ]]; then
+    no "herdr fixture: the sandbox server did not come up"
+  else
+    url="https://example.com/\$(touch\${IFS}$SANDBOX/pwned)"
+    out=$(run 0.8 "$(jq -nc --arg url "$url" \
+      '{type: "agent", site: "x", url: $url, census: {}, screenshot: null}')")
+    for _ in {1..30}; do
+      [[ -s $SANDBOX/argv ]] && break
+      sleep 0.1
+    done
+    if [[ -e $SANDBOX/pwned ]]; then
+      no "herdr launch: a command substitution in the page URL ran in the pane's shell"
+    elif ! grep -q 'launched in herdr' <<<"$out"; then
+      no "herdr launch: the host did not hand the agent to a running herdr server"
+    elif python3 - "$SANDBOX/argv" "$url" <<'PY'
+import sys
+argv = open(sys.argv[1], "rb").read().decode().split("\0")[:-1]
+sys.exit(0 if len(argv) == 2 and argv[0] == "--inline" and sys.argv[2] in argv[1] else 1)
+PY
+    then
+      ok "herdr launch hands the prompt over as data; a shell-shaped page URL stays text"
+    else
+      no "herdr launch: the agent did not receive the prompt intact"
+    fi
+  fi
+  sandboxed herdr server stop >/dev/null 2>&1
+  teardown
+else
+  printf '  skip herdr launch (herdr not installed)\n'
+fi
+
 # --- protocol ----------------------------------------------------------------
 
 setup
-out=$(HOME="$SANDBOX" XDG_RUNTIME_DIR="$SANDBOX/run" python3 - "$HOST" <<'PY'
+out=$(sandboxed python3 - "$HOST" <<'PY'
 import struct, subprocess, sys, time
 p = subprocess.Popen([sys.argv[1]], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                      stderr=subprocess.DEVNULL)

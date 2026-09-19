@@ -1,0 +1,11 @@
+#!/bin/bash
+# Runs inside the herdr pane umber-host opened for an agent session. umber-host
+# types this command into the pane's shell. The prompt comes from a file rather
+# than from that command line because whatever shell the pane runs parses the
+# line, and the prompt carries a URL the page shaped.
+#
+# exec all the way down, so the tab closes when the agent exits, the same way
+# the stock floating terminal does.
+
+prompt=$(<"${1:?usage: umber-agent-run <prompt-file>}") || exit 1
+exec omarchy-agent-prompt --inline "$prompt"
